@@ -1,11 +1,12 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/search/search_screen.dart';
 import '../screens/word_detail/word_detail_screen.dart';
 import '../screens/collections/collections_screen.dart';
-import '../data/models/dictionary_entry.dart';
-import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/main_scaffold.dart';
+import '../data/models/dictionary_entry.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');

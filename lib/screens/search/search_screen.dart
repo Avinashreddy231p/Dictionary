@@ -170,7 +170,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 context,
                 word: entry.word,
                 pos: entry.partOfSpeech,
-                meaning: entry.meaning,
+                meaning: entry.meanings.isNotEmpty ? entry.meanings.first : 'No definition available',
                 entry: entry,
               ),
             )),

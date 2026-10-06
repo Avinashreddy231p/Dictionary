@@ -17,8 +17,15 @@ class AppColors {
   static const Color softYellow = Color(0xFFFFEEA9);
   static const Color softPurple = Color(0xFFE3DFFF);
   static const Color softGreen = Color(0xFFD8F3D1);
-  static const Color softPeach = Color(0xFFFFDFD1);
-  static const Color softBlue = Color(0xFFD6E6FF);
+  // New specific colors from the exact mockup
+  static const Color headerYellow = Color(0xFFFFCC33);
+  static const Color badgeTeal = Color(0xFF13C1B6);
+  static const Color anatomyGreen = Color(0xFFCEF0B5);
+  static const Color anatomyBlue = Color(0xFFBBD3FF);
+  static const Color anatomyPurple = Color(0xFFDFCCFF);
+  static const Color examplePink = Color(0xFFFAEOE5); // Muted pink
+  static const Color illustrationPurple = Color(0xFFC7B8FF);
+  static const Color buttonBlack = Color(0xFF1E1E1E);
   
   // Custom Gradients (e.g. for "Continue Reading" or smart cards)
   static const LinearGradient continueReadingGradient = LinearGradient(
