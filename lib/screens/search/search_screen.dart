@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../core/providers.dart';
 import '../../domain/dictionary_repository.dart';
-import '../../data/models/dictionary_entry.dart';
+import '../../data/models/lexical_entry.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -18,7 +18,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final DictionaryRepository _repository = DictionaryRepository();
 
-  List<DictionaryEntry> _results = [];
+  List<LexicalEntry> _results = [];
   bool _isLoading = false;
   String _lastQuery = '';
 
@@ -207,10 +207,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.only(bottom: 12.0),
               child: _buildResultCard(
                 context,
-                word: entry.word,
-                pos: entry.partOfSpeech,
-                meaning: entry.meanings.isNotEmpty
-                    ? entry.meanings.first
+                word: entry.core.headword,
+                pos: entry.core.partOfSpeech,
+                meaning: entry.senses.isNotEmpty
+                    ? entry.senses.first.definition
                     : 'No definition available',
                 entry: entry,
               ),
@@ -224,7 +224,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     required String word,
     required String pos,
     required String meaning,
-    required DictionaryEntry entry,
+    required LexicalEntry entry,
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;

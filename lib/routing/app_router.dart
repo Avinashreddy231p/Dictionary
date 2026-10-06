@@ -6,7 +6,7 @@ import '../screens/word_detail/word_detail_screen.dart';
 import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/main_scaffold.dart';
-import '../data/models/dictionary_entry.dart';
+import '../data/models/lexical_entry.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -42,7 +42,7 @@ final goRouter = GoRouter(
                       path: 'detail',
                       parentNavigatorKey: _rootNavigatorKey,
                       builder: (context, state) {
-                        final entry = state.extra as DictionaryEntry?;
+                        final entry = state.extra as LexicalEntry?;
                         return WordDetailScreen(entry: entry);
                       },
                     ),

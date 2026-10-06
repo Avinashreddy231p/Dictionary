@@ -17,111 +17,52 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   String _searchQuery = '';
   String _selectedFilter = 'All';
 
-  void _showCreateCollectionDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    String selectedColor = '0xFFE5D4FF';
+  final List<Map<String, dynamic>> _iconOptions = [
+    {'name': 'book', 'icon': CupertinoIcons.book_fill},
+    {'name': 'bookmark', 'icon': CupertinoIcons.bookmark_fill},
+    {'name': 'star', 'icon': CupertinoIcons.star_fill},
+    {'name': 'flame', 'icon': CupertinoIcons.flame_fill},
+    {'name': 'lightbulb', 'icon': CupertinoIcons.lightbulb_fill},
+    {'name': 'heart', 'icon': CupertinoIcons.heart_fill},
+    {'name': 'folder', 'icon': CupertinoIcons.folder_fill},
+    {'name': 'tag', 'icon': CupertinoIcons.tag_fill},
+    {'name': 'sparkles', 'icon': CupertinoIcons.sparkles},
+    {'name': 'flag', 'icon': CupertinoIcons.flag_fill},
+  ];
 
-    final colors = [
-      '0xFFE5D4FF', // Soft purple
-      '0xFFD4F5E9', // Soft green
-      '0xFFFFE2D4', // Soft peach
-      '0xFFD4E3FF', // Soft blue
-      '0xFFFFF3D4', // Soft yellow
-    ];
+  final List<String> _colorOptions = [
+    '0xFFE5D4FF', // Soft purple
+    '0xFFD4F5E9', // Soft green
+    '0xFFFFE2D4', // Soft peach
+    '0xFFD4E3FF', // Soft blue
+    '0xFFFFF3D4', // Soft yellow
+    '0xFFFFD4E5', // Soft pink
+  ];
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: const Text('Create New Collection'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: 'Collection Name',
-                    hintText: 'e.g. Science Terminology',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descController,
-                  decoration: InputDecoration(
-                    labelText: 'Description (optional)',
-                    hintText: 'e.g. Terms from biology chapter 4',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text('Accent Color:', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: colors.map((cHex) {
-                    final isSelected = selectedColor == cHex;
-                    final color = Color(int.parse(cHex));
-                    return GestureDetector(
-                      onTap: () {
-                        setDialogState(() {
-                          selectedColor = cHex;
-                        });
-                      },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(color: AppColors.textPrimary, width: 3)
-                              : Border.all(color: AppColors.border, width: 1),
-                        ),
-                        child: isSelected
-                            ? const Icon(CupertinoIcons.check_mark, size: 16, color: AppColors.textPrimary)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
-                )
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.textPrimary,
-                foregroundColor: AppColors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: () async {
-                final title = titleController.text.trim();
-                if (title.isNotEmpty) {
-                  Navigator.pop(ctx);
-                  final db = ref.read(databaseProvider);
-                  await db.createCollection(
-                    title: title,
-                    description: descController.text.trim(),
-                    colorHex: selectedColor,
-                  );
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      ),
-    );
+  IconData _getIconData(String? iconName) {
+    switch (iconName) {
+      case 'bookmark':
+        return CupertinoIcons.bookmark_fill;
+      case 'star':
+        return CupertinoIcons.star_fill;
+      case 'flame':
+        return CupertinoIcons.flame_fill;
+      case 'lightbulb':
+        return CupertinoIcons.lightbulb_fill;
+      case 'heart':
+        return CupertinoIcons.heart_fill;
+      case 'folder':
+        return CupertinoIcons.folder_fill;
+      case 'tag':
+        return CupertinoIcons.tag_fill;
+      case 'sparkles':
+        return CupertinoIcons.sparkles;
+      case 'flag':
+        return CupertinoIcons.flag_fill;
+      case 'book':
+      default:
+        return CupertinoIcons.book_fill;
+    }
   }
 
   Color _parseColor(String? colorHex, bool isDark) {
@@ -131,6 +72,422 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     } catch (_) {
       return isDark ? AppColors.darkSoftPurple : AppColors.softPurple;
     }
+  }
+
+  // Modal Bottom Sheet for Creating / Editing Collections
+  void _showCollectionBottomSheet(BuildContext context, {Collection? collectionToEdit}) {
+    final isEditing = collectionToEdit != null;
+    final titleController = TextEditingController(text: collectionToEdit?.title ?? '');
+    final descController = TextEditingController(text: collectionToEdit?.description ?? '');
+    String selectedColor = collectionToEdit?.colorHex ?? '0xFFE5D4FF';
+    String selectedIcon = collectionToEdit?.iconName ?? 'book';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setBottomSheetState) {
+          final theme = Theme.of(context);
+          final isDark = theme.brightness == Brightness.dark;
+          final previewColor = _parseColor(selectedColor, isDark);
+          final previewIcon = _getIconData(selectedIcon);
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white30 : Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isEditing ? 'Edit Collection' : 'Create New Collection',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(CupertinoIcons.xmark_circle_fill, color: isDark ? Colors.white54 : AppColors.textDisabled),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Live Card Preview
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: theme.cardTheme.color,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: previewColor,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(previewIcon, color: AppColors.textPrimary, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  titleController.text.trim().isNotEmpty
+                                      ? titleController.text.trim()
+                                      : 'Collection Title',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  descController.text.trim().isNotEmpty
+                                      ? descController.text.trim()
+                                      : 'Description preview',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Collection Name Field
+                    TextField(
+                      controller: titleController,
+                      autofocus: !isEditing,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Collection Name',
+                        hintText: 'e.g. Science Terminology',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Description Field
+                    TextField(
+                      controller: descController,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Description (optional)',
+                        hintText: 'e.g. Terms from biology chapter 4',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Icon Selector
+                    Text('Choose Icon:', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: _iconOptions.map((opt) {
+                          final name = opt['name'] as String;
+                          final icon = opt['icon'] as IconData;
+                          final isSelected = selectedIcon == name;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: InkWell(
+                              onTap: () {
+                                setBottomSheetState(() {
+                                  selectedIcon = name;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: 44,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? theme.primaryColor : theme.cardTheme.color,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isSelected ? theme.primaryColor : AppColors.cardBorder(context),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Icon(
+                                  icon,
+                                  size: 20,
+                                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Color Selector
+                    Text('Accent Color:', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: _colorOptions.map((cHex) {
+                        final isSelected = selectedColor == cHex;
+                        final color = Color(int.parse(cHex));
+                        return GestureDetector(
+                          onTap: () {
+                            setBottomSheetState(() {
+                              selectedColor = cHex;
+                            });
+                          },
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(color: AppColors.textPrimary, width: 3)
+                                  : Border.all(color: AppColors.border, width: 1),
+                            ),
+                            child: isSelected
+                                ? const Icon(CupertinoIcons.check_mark, size: 16, color: AppColors.textPrimary)
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          final title = titleController.text.trim();
+                          if (title.isNotEmpty) {
+                            Navigator.pop(ctx);
+                            final db = ref.read(databaseProvider);
+                            if (isEditing) {
+                              await db.updateCollection(
+                                id: collectionToEdit.id,
+                                title: title,
+                                description: descController.text.trim(),
+                                colorHex: selectedColor,
+                                iconName: selectedIcon,
+                              );
+                            } else {
+                              await db.createCollection(
+                                title: title,
+                                description: descController.text.trim(),
+                                colorHex: selectedColor,
+                                iconName: selectedIcon,
+                              );
+                            }
+                          }
+                        },
+                        child: Text(
+                          isEditing ? 'Save Changes' : 'Create Collection',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Bottom Sheet for Collection Options (Edit / Delete)
+  void _showCollectionOptionsBottomSheet(BuildContext context, Collection collection, int wordCount) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accentColor = _parseColor(collection.colorHex, isDark);
+    final iconData = _getIconData(collection.iconName);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag Handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white30 : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Header Preview
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(iconData, color: AppColors.textPrimary, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          collection.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$wordCount words',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.primaryColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Option 1: Edit Collection
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(CupertinoIcons.pencil, color: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary, size: 20),
+                ),
+                title: const Text('Edit Collection', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Change name, description, icon or accent color', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showCollectionBottomSheet(context, collectionToEdit: collection);
+                },
+              ),
+
+              const Divider(height: 16),
+
+              // Option 2: Delete Collection
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.trash, color: Colors.redAccent, size: 20),
+                ),
+                title: const Text('Delete Collection', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                subtitle: const Text('Permanently remove this collection', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteCollection(context, collection);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteCollection(BuildContext context, Collection collection) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Delete Collection?'),
+        content: Text('Are you sure you want to delete "${collection.title}"? The words will remain in your general vocabulary.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(databaseProvider).deleteCollection(collection.id);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -221,10 +578,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final col = filteredCols[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildCollectionListItem(context, col),
-                          );
+                          return _buildCollectionCard(context, col);
                         },
                         childCount: filteredCols.length,
                       ),
@@ -253,24 +607,29 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'My Collections',
-              style: theme.textTheme.displayMedium?.copyWith(
-                    height: 1.1,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Your saved vocabulary organized.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                  ),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'My Collections',
+                softWrap: true,
+                style: theme.textTheme.displayMedium?.copyWith(
+                      height: 1.1,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Your saved vocabulary organized.',
+                softWrap: true,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 12),
         Icon(CupertinoIcons.sparkles, color: theme.primaryColor, size: 32),
       ],
     );
@@ -380,6 +739,17 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     required int bookCount,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+
+    // Dynamically adjust childAspectRatio to allow extra vertical room for large fonts
+    double aspectRatio = 1.25;
+    if (textScale > 1.8) {
+      aspectRatio = 0.8;
+    } else if (textScale > 1.4) {
+      aspectRatio = 0.95;
+    } else if (textScale > 1.15) {
+      aspectRatio = 1.1;
+    }
 
     return GridView.count(
       crossAxisCount: 2,
@@ -387,7 +757,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       mainAxisSpacing: 16,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.2,
+      childAspectRatio: aspectRatio,
       children: [
         _buildSmartCard(
           context,
@@ -500,6 +870,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(icon, color: textColor, size: 28),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -507,11 +878,14 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
-                              height: 1.2,
+                              height: 1.15,
                               fontWeight: FontWeight.w800,
                               color: textColor,
                             ),
@@ -519,13 +893,17 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                              color: textColor.withOpacity(0.8),
+                              color: textColor.withOpacity(0.85),
+                              fontWeight: FontWeight.w600,
                             ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
@@ -552,12 +930,17 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'My Collections',
-          style: theme.textTheme.titleMedium,
+        Expanded(
+          child: Text(
+            'My Collections',
+            style: theme.textTheme.titleMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
+        const SizedBox(width: 8),
         TextButton.icon(
-          onPressed: () => _showCreateCollectionDialog(context),
+          onPressed: () => _showCollectionBottomSheet(context),
           icon: const Icon(CupertinoIcons.add, size: 16),
           label: const Text('New Collection'),
           style: TextButton.styleFrom(
@@ -571,9 +954,11 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildCollectionListItem(BuildContext context, Collection collection) {
+  Widget _buildCollectionCard(BuildContext context, Collection collection) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final accentColor = _parseColor(collection.colorHex, isDark);
+    final iconData = _getIconData(collection.iconName);
     final wordsAsync = ref.watch(collectionWordsStreamProvider(collection.id));
 
     return wordsAsync.when(
@@ -582,75 +967,168 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         final learning = words.where((w) => w.reviewState == 0).length;
         final review = words.where((w) => w.reviewState == 1).length;
 
-        final progressText = words.isEmpty
-            ? '0 words'
-            : '$known known • $learning learning${review > 0 ? ' • $review review' : ''}';
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: theme.cardTheme.color,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CollectionDetailScreen(
+                      collectionId: collection.id,
+                      title: collection.title,
+                      description: collection.description,
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Row: Custom Icon + Title/Desc + Option Icon (No Pill Badge!)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Icon Badge
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            iconData,
+                            color: AppColors.textPrimary,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Title & Subtitle & Word Count
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                collection.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Text(
+                                    '${words.length} words',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.primaryColor,
+                                    ),
+                                  ),
+                                  if (collection.description != null && collection.description!.isNotEmpty) ...[
+                                    const Text('  •  ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                    Expanded(
+                                      child: Text(
+                                        collection.description!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            CupertinoIcons.ellipsis_vertical,
+                            size: 18,
+                            color: isDark ? Colors.white54 : AppColors.textSecondary,
+                          ),
+                          onPressed: () => _showCollectionOptionsBottomSheet(context, collection, words.length),
+                        ),
+                      ],
+                    ),
 
-        return InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CollectionDetailScreen(
-                  collectionId: collection.id,
-                  title: collection.title,
-                  description: collection.description,
+                    // Progress Stats Breakdown
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        _buildDotIndicator(isDark ? AppColors.darkSoftGreenText : AppColors.softGreen, '$known known'),
+                        const SizedBox(width: 12),
+                        _buildDotIndicator(isDark ? AppColors.darkSoftYellowText : AppColors.softYellow, '$learning learning'),
+                        if (review > 0) ...[
+                          const SizedBox(width: 12),
+                          _buildDotIndicator(isDark ? AppColors.darkSoftPinkText : AppColors.softPeach, '$review review'),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Multi-Segment Progress Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        height: 6,
+                        child: Row(
+                          children: [
+                            if (words.isNotEmpty) ...[
+                              Expanded(
+                                flex: known > 0 ? known : 0,
+                                child: Container(color: isDark ? AppColors.darkSoftGreen : AppColors.softGreen),
+                              ),
+                              Expanded(
+                                flex: learning > 0 ? learning : 0,
+                                child: Container(color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow),
+                              ),
+                              Expanded(
+                                flex: review > 0 ? review : 0,
+                                child: Container(color: isDark ? AppColors.darkSoftPink : AppColors.softPeach),
+                              ),
+                              if (known == 0 && learning == 0 && review == 0)
+                                Expanded(child: Container(color: AppColors.cardBorder(context))),
+                            ] else
+                              Expanded(child: Container(color: AppColors.cardBorder(context))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.cardTheme.color,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: _parseColor(collection.colorHex, isDark),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(CupertinoIcons.book, color: isDark ? Colors.white70 : AppColors.textSecondary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        collection.title,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${words.length} words',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        progressText,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(CupertinoIcons.chevron_right, color: isDark ? Colors.white54 : AppColors.textSecondary),
-              ],
             ),
           ),
         );
       },
       loading: () => Container(
-        height: 80,
+        height: 100,
+        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(24),
@@ -658,6 +1136,30 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         child: const Center(child: CircularProgressIndicator()),
       ),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildDotIndicator(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ],
     );
   }
 }

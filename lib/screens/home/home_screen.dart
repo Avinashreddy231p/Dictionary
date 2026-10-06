@@ -2,10 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
-import '../../data/models/dictionary_entry.dart';
+import '../../data/models/lexical_entry.dart';
 import '../collections/collection_detail_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -70,12 +69,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                 await db.saveWord(
                   word: word,
-                  phonetic: entry?.phonetic,
-                  partOfSpeech: entry?.partOfSpeech ?? 'word',
+                  phonetic: entry?.core.phonetic,
+                  partOfSpeech: entry?.core.partOfSpeech ?? 'word',
                   meaning: meaningController.text.trim().isNotEmpty
                       ? meaningController.text.trim()
-                      : (entry?.meanings.isNotEmpty == true ? entry!.meanings.first : 'Custom word'),
-                  example: entry?.examples.isNotEmpty == true ? entry!.examples.first : null,
+                      : (entry?.lexiLens.simpleMeaning ?? 'Custom word'),
+                  example: (entry?.senses.isNotEmpty == true && entry!.senses.first.examples.isNotEmpty)
+                      ? entry.senses.first.examples.first
+                      : null,
                   source: 'Manual Add',
                 );
               }
@@ -660,20 +661,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 if (results.isNotEmpty && context.mounted) {
                   context.push('/home/search/detail', extra: results.first);
                 } else if (todayWord != null && context.mounted) {
-                  final fallbackEntry = DictionaryEntry(
-                    word: todayWord.word,
-                    partOfSpeech: todayWord.partOfSpeech ?? 'word',
-                    phonetic: todayWord.phonetic ?? '',
-                    syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
-                    meanings: [todayWord.meaning ?? 'Vocabulary word'],
-                    examples: todayWord.example != null ? [todayWord.example!] : [],
-                    synonyms: [],
-                    antonyms: [],
-                    inflections: [],
-                    grammaticalInfo: [],
-                    registers: [],
-                    domains: [],
-                    etymology: '',
+                  final fallbackEntry = LexicalEntry(
+                    core: CoreData(
+                      headword: todayWord.word,
+                      homograph: 0,
+                      partOfSpeech: todayWord.partOfSpeech ?? 'word',
+                      phonetic: todayWord.phonetic ?? '',
+                      audioUrl: '',
+                      syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
+                    ),
+                    senses: [
+                      Sense(
+                        senseNumber: '1',
+                        definition: todayWord.meaning ?? 'Vocabulary word',
+                        examples: todayWord.example != null ? [todayWord.example!] : [],
+                        labels: [],
+                      )
+                    ],
+                    grammar: GrammarData(
+                      verbDivision: '',
+                      usageNotes: [],
+                      inflections: [],
+                      relatedForms: [],
+                    ),
+                    linguistic: LinguisticData(
+                      etymology: '',
+                      firstKnownUse: '',
+                    ),
+                    lexiLens: LexiLensLayer(
+                      simpleMeaning: todayWord.meaning ?? 'Vocabulary word',
+                      contextualMeaning: todayWord.contextSentence ?? '',
+                      synonyms: [],
+                      antonyms: [],
+                    ),
                   );
                   context.push('/home/search/detail', extra: fallbackEntry);
                 }

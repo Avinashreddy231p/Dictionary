@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../data/models/dictionary_entry.dart';
+import '../data/models/lexical_entry.dart';
 import '../data/services/merriam_webster_service.dart';
 
 class DictionaryRepository {
@@ -9,7 +9,7 @@ class DictionaryRepository {
   DictionaryRepository({MerriamWebsterService? service})
       : _service = service ?? MerriamWebsterService();
 
-  Future<List<DictionaryEntry>> searchWord(String query) async {
+  Future<List<LexicalEntry>> searchWord(String query) async {
     try {
       final mwResults = await _service.fetchWord(query);
       if (mwResults.isEmpty) return [];
@@ -30,30 +30,23 @@ class DictionaryRepository {
           antonyms = data.take(5).map((e) => e['word'] as String).toList();
         }
       } catch (_) {
-        // Silently fail if Datamuse fails, MW results are more important
+        // Datamuse network errors fail gracefully
       }
 
-      // Enrich the results with Datamuse data
+      // Enrich entries with Datamuse relational data
       return mwResults.map((entry) {
-        return DictionaryEntry(
-          word: entry.word,
-          partOfSpeech: entry.partOfSpeech,
-          phonetic: entry.phonetic,
-          syllables: entry.syllables,
-          meanings: entry.meanings,
-          examples: entry.examples,
-          synonyms: synonyms,
-          antonyms: antonyms,
-          inflections: entry.inflections,
-          grammaticalInfo: entry.grammaticalInfo,
-          registers: entry.registers,
-          domains: entry.domains,
-          etymology: entry.etymology,
-          audioUrl: entry.audioUrl,
+        return LexicalEntry(
+          core: entry.core,
+          senses: entry.senses,
+          grammar: entry.grammar,
+          linguistic: entry.linguistic,
+          lexiLens: entry.lexiLens.copyWith(
+            synonyms: synonyms,
+            antonyms: antonyms,
+          ),
         );
       }).toList();
     } catch (e) {
-      // Log error, rethrow, or return empty list based on strategy
       return [];
     }
   }

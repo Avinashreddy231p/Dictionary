@@ -75,7 +75,28 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2; // Incremented to trigger migration
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        if (from < 2) {
+          // If you add new tables, uncomment these
+          // await m.createTable(collections);
+          // await m.createTable(collectionWords);
+          // await m.createTable(recentSearches);
+        }
+      },
+      beforeOpen: (details) async {
+        // Optional: Enable foreign keys if you use them heavily
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
+    );
+  }
 
   // --- Saved Words Queries & Streams ---
   Stream<List<SavedWord>> watchAllSavedWords() {
@@ -149,6 +170,12 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
+  Future<void> updatePersonalNote(int savedWordId, String note) async {
+    await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
+      SavedWordsCompanion(personalNote: Value(note)),
+    );
+  }
+
   Future<void> removeSavedWord(String word) async {
     await (delete(savedWords)..where((t) => t.word.equals(word.toLowerCase()))).go();
   }
@@ -198,9 +225,26 @@ class AppDatabase extends _$AppDatabase {
       title: title,
       description: Value(description),
       colorHex: Value(colorHex ?? '0xFFE5D4FF'),
-      iconName: Value(iconName),
+      iconName: Value(iconName ?? 'book'),
       createdAt: DateTime.now(),
     ));
+  }
+
+  Future<void> updateCollection({
+    required int id,
+    required String title,
+    String? description,
+    String? colorHex,
+    String? iconName,
+  }) async {
+    await (update(collections)..where((t) => t.id.equals(id))).write(
+      CollectionsCompanion(
+        title: Value(title),
+        description: Value(description),
+        colorHex: Value(colorHex ?? '0xFFE5D4FF'),
+        iconName: Value(iconName ?? 'book'),
+      ),
+    );
   }
 
   Future<void> deleteCollection(int collectionId) async {
