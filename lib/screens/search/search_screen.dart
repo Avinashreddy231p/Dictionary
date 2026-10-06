@@ -2,9 +2,51 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
+import '../../domain/dictionary_repository.dart';
+import '../../data/models/dictionary_entry.dart';
 
-class SearchScreen extends StatelessWidget {
+class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final DictionaryRepository _repository = DictionaryRepository();
+  
+  List<DictionaryEntry> _results = [];
+  bool _isLoading = false;
+  String _lastQuery = '';
+
+  void _performSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _results = [];
+        _lastQuery = '';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _lastQuery = query;
+    });
+
+    final results = await _repository.searchWord(query.trim());
+
+    setState(() {
+      _results = results;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +79,14 @@ class SearchScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSearchBar(context),
             const SizedBox(height: 24),
-            _buildDidYouMean(context),
-            const SizedBox(height: 32),
-            _buildSearchResults(context),
-            const SizedBox(height: 24),
-            _buildNoResults(context),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator(color: AppColors.primaryPurple))
+            else if (_results.isNotEmpty)
+              _buildSearchResults(context)
+            else if (_lastQuery.isNotEmpty)
+              _buildNoResults(context)
+            else
+              _buildDidYouMean(context), // Show as placeholder when empty
           ],
         ),
       ),
@@ -50,13 +95,18 @@ class SearchScreen extends StatelessWidget {
 
   Widget _buildSearchBar(BuildContext context) {
     return TextField(
+      controller: _searchController,
       autofocus: true,
+      onSubmitted: _performSearch,
       decoration: InputDecoration(
-        hintText: 'reluctent',
+        hintText: 'Search a word...',
         prefixIcon: const Icon(CupertinoIcons.search, color: AppColors.textSecondary),
         suffixIcon: IconButton(
           icon: const Icon(CupertinoIcons.clear_circled_solid, color: AppColors.textDisabled),
-          onPressed: () {},
+          onPressed: () {
+            _searchController.clear();
+            _performSearch('');
+          },
         ),
       ),
     );
@@ -78,7 +128,7 @@ class SearchScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Did you mean?',
+                  'Try searching for',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textPrimary,
                       ),
@@ -108,32 +158,22 @@ class SearchScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text(
-              '3 results',
+              '${_results.length} results',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
         const SizedBox(height: 16),
-        _buildResultCard(
-          context,
-          word: 'RELUCTANT',
-          pos: 'adjective • B2',
-          meaning: 'Not wanting to do something.',
-        ),
-        const SizedBox(height: 12),
-        _buildResultCard(
-          context,
-          word: 'RELUCTANCE',
-          pos: 'noun • B2',
-          meaning: 'The feeling of not wanting to do something.',
-        ),
-        const SizedBox(height: 12),
-        _buildResultCard(
-          context,
-          word: 'RELUCTANTLY',
-          pos: 'adverb • B2',
-          meaning: 'In a reluctant way.',
-        ),
+        ..._results.map((entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: _buildResultCard(
+                context,
+                word: entry.word,
+                pos: entry.partOfSpeech,
+                meaning: entry.meaning,
+                entry: entry,
+              ),
+            )),
       ],
     );
   }
@@ -143,10 +183,11 @@ class SearchScreen extends StatelessWidget {
     required String word,
     required String pos,
     required String meaning,
+    required DictionaryEntry entry,
   }) {
     return GestureDetector(
       onTap: () {
-        context.push('/home/search/detail', extra: word.toLowerCase());
+        context.push('/home/search/detail', extra: entry);
       },
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -163,9 +204,13 @@ class SearchScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        word,
-                        style: Theme.of(context).textTheme.titleMedium,
+                      Expanded(
+                        child: Text(
+                          word,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       const Icon(CupertinoIcons.speaker_2, size: 16, color: AppColors.textSecondary),
@@ -184,6 +229,8 @@ class SearchScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -212,7 +259,7 @@ class SearchScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'No results for "reluctent"?',
+                  'No results for "$_lastQuery"?',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),

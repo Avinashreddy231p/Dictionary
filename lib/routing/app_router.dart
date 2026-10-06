@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/search/search_screen.dart';
 import '../screens/word_detail/word_detail_screen.dart';
+import '../screens/collections/collections_screen.dart';
+import '../data/models/dictionary_entry.dart';
 import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/main_scaffold.dart';
@@ -41,8 +41,8 @@ final goRouter = GoRouter(
                       path: 'detail',
                       parentNavigatorKey: _rootNavigatorKey,
                       builder: (context, state) {
-                        final word = state.extra as String?;
-                        return WordDetailScreen(word: word);
+                        final entry = state.extra as DictionaryEntry?;
+                        return WordDetailScreen(entry: entry);
                       },
                     ),
                   ],
