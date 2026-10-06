@@ -50,6 +50,18 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 28),
                     _buildSectionHeader(
                       context,
+                      icon: CupertinoIcons.sparkles,
+                      title: 'AI Assistant & Gemini Engine',
+                      primaryColor: primaryColor,
+                    ),
+                    const SizedBox(height: 12),
+                    _GeminiSettingsCard(
+                      primaryColor: primaryColor,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 28),
+                    _buildSectionHeader(
+                      context,
                       icon: CupertinoIcons.paintbrush_fill,
                       title: 'Appearance & Interaction',
                       primaryColor: primaryColor,
@@ -1688,6 +1700,437 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GeminiSettingsCard extends ConsumerStatefulWidget {
+  final Color primaryColor;
+  final bool isDark;
+
+  const _GeminiSettingsCard({
+    required this.primaryColor,
+    required this.isDark,
+  });
+
+  @override
+  ConsumerState<_GeminiSettingsCard> createState() => _GeminiSettingsCardState();
+}
+
+class _GeminiSettingsCardState extends ConsumerState<_GeminiSettingsCard> {
+  late TextEditingController _keyController;
+  bool _obscureKey = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initialKey = ref.read(settingsProvider).geminiApiKey;
+    _keyController = TextEditingController(text: initialKey);
+  }
+
+  @override
+  void dispose() {
+    _keyController.dispose();
+    super.dispose();
+  }
+
+  void _showFeedback(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showModelSelectionSheet(
+    BuildContext context,
+    SettingsState settings,
+    SettingsNotifier settingsNotifier,
+  ) {
+    final models = [
+      {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash', 'desc': 'Recommended • Next-gen speed & intelligence'},
+      {'id': 'gemini-1.5-flash', 'name': 'Gemini 1.5 Flash', 'desc': 'Fast & lightweight for daily lookups'},
+      {'id': 'gemini-1.5-pro', 'name': 'Gemini 1.5 Pro', 'desc': 'Deep reasoning & complex nuance analysis'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF1D1D2C) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(
+              color: widget.isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: widget.isDark ? Colors.white24 : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Select AI Model',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              Column(
+                children: models.map((m) {
+                  final isSelected = settings.geminiModel == m['id'];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        settingsNotifier.setGeminiModel(m['id']!);
+                        _showFeedback(context, 'Selected model: ${m['name']}');
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? widget.primaryColor.withOpacity(0.12)
+                              : (widget.isDark ? const Color(0xFF27273C) : AppColors.background),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isSelected
+                                ? widget.primaryColor
+                                : (widget.isDark ? const Color(0xFF383852) : AppColors.border),
+                            width: isSelected ? 2 : 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    m['name']!,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: isSelected
+                                          ? widget.primaryColor
+                                          : (widget.isDark ? Colors.white : AppColors.textPrimary),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    m['desc']!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: widget.isDark ? Colors.white60 : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(Icons.check_circle_rounded, color: widget.primaryColor, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+
+    String modelDisplayName = 'Gemini 2.0 Flash';
+    if (settings.geminiModel == 'gemini-1.5-flash') {
+      modelDisplayName = 'Gemini 1.5 Flash';
+    } else if (settings.geminiModel == 'gemini-1.5-pro') {
+      modelDisplayName = 'Gemini 1.5 Pro';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // CREDENTIALS SECTION
+        Text(
+          'Credentials',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: widget.primaryColor,
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: widget.isDark ? const Color(0xFF1D1D2C) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: widget.isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Google Gemini API Key',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Get from Google AI Studio (aistudio.google.com)',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _keyController,
+                obscureText: _obscureKey,
+                onChanged: (val) {
+                  settingsNotifier.setGeminiApiKey(val.trim());
+                },
+                decoration: InputDecoration(
+                  hintText: 'Paste API Key here...',
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      Icons.vpn_key_rounded,
+                      color: widget.primaryColor,
+                      size: 20,
+                    ),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 0),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          _obscureKey ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureKey = !_obscureKey;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.content_paste_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        onPressed: () async {
+                          final data = await Clipboard.getData(Clipboard.kTextPlain);
+                          if (data != null && data.text != null) {
+                            final text = data.text!.trim();
+                            _keyController.text = text;
+                            settingsNotifier.setGeminiApiKey(text);
+                            if (context.mounted) {
+                              _showFeedback(context, 'Pasted API Key from Clipboard');
+                            }
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: widget.primaryColor,
+                        side: BorderSide(color: widget.primaryColor.withOpacity(0.5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () async {
+                        await Clipboard.setData(const ClipboardData(text: 'https://aistudio.google.com/app/api-keys'));
+                        if (context.mounted) {
+                          _showFeedback(context, 'Link copied: aistudio.google.com/app/api-keys');
+                        }
+                      },
+                      icon: Icon(Icons.launch_rounded, size: 16, color: widget.primaryColor),
+                      label: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Get API Key',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.isDark ? const Color(0xFF2C2C40) : const Color(0xFF2C2C3E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: _isSaving
+                          ? null
+                          : () async {
+                              final key = _keyController.text.trim();
+                              if (key.isEmpty) {
+                                _showFeedback(context, 'Please enter or paste a Gemini API key');
+                                return;
+                              }
+                              setState(() => _isSaving = true);
+                              await settingsNotifier.setGeminiApiKey(key);
+                              final geminiService = ref.read(geminiServiceProvider);
+                              final success = await geminiService.testApiKey(key, model: settings.geminiModel);
+                              setState(() => _isSaving = false);
+                              if (context.mounted) {
+                                if (success) {
+                                  _showFeedback(context, 'Connected successfully to Gemini ${settings.geminiModel}! ✨');
+                                } else {
+                                  _showFeedback(context, 'Key Saved. Connection failed - please check Key.');
+                                }
+                              }
+                            },
+                      icon: _isSaving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.bolt_rounded, size: 18),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          _isSaving ? 'Testing...' : 'Test Connection',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // MODEL SELECTION SECTION
+        Text(
+          'Model Selection',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: widget.primaryColor,
+            letterSpacing: 0.3,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _showModelSelectionSheet(context, settings, settingsNotifier),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: widget.isDark ? const Color(0xFF1D1D2C) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: widget.isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: widget.isDark ? const Color(0xFF27273C) : AppColors.softYellow.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.science_rounded, color: Colors.amber.shade800, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'AI Model',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Select a model.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: widget.isDark ? widget.primaryColor.withOpacity(0.25) : AppColors.softPurple,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: widget.primaryColor.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        modelDisplayName,
+                        style: TextStyle(
+                          color: widget.isDark ? Colors.white : widget.primaryColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: widget.primaryColor),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

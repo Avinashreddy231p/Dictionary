@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'database/database.dart';
 import '../data/repositories/word_repository.dart';
+import '../data/services/gemini_service.dart';
+import 'providers/settings_provider.dart';
 
 export 'providers/settings_provider.dart';
 
@@ -15,6 +17,11 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final wordRepositoryProvider = Provider<WordRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return WordRepository(db);
+});
+
+final geminiServiceProvider = Provider<GeminiService>((ref) {
+  final settings = ref.watch(settingsProvider);
+  return GeminiService(defaultModel: settings.geminiModel);
 });
 
 // Trigger to open keyboard on Search screen when Search bottom nav icon is tapped/double-tapped

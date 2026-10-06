@@ -186,16 +186,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
-              const SizedBox(height: 24),
-              _buildHeroSection(context),
               const SizedBox(height: 20),
+              _buildQuickActions(context),
+              const SizedBox(height: 24),
               _buildSearchSection(context),
               const SizedBox(height: 28),
               _buildTodayVocabulary(context),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               _buildContinueReading(context),
-              const SizedBox(height: 28),
-              _buildQuickActions(context),
               const SizedBox(height: 32),
             ],
           ),
@@ -262,136 +260,112 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildHeroSection(BuildContext context) {
+  Widget _buildQuickActions(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: isDark
-            ? AppColors.homeHeroGradientDark
-            : const LinearGradient(
-                colors: [Color(0xFFFFF7E6), Color(0xFFFFECC8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : const Color(0xFFF0E2C8),
-          width: 1.5,
-        ),
-      ),
-      child: Stack(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.darkHeaderYellowText.withOpacity(0.15)
-                            : AppColors.textPrimary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            CupertinoIcons.star_fill,
-                            size: 12,
-                            color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'DAILY DISCOVERY',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.0,
-                              color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Better Words,\nBigger Stories.',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        height: 1.15,
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Explore nuanced definitions, context & smart vocabulary collections.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                        fontSize: 12,
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: Container(
-                  height: 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDark ? AppColors.darkSoftYellow : AppColors.headerYellow.withOpacity(0.4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isDark ? Colors.black : Colors.amber).withOpacity(0.12),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          CupertinoIcons.book_fill,
-                          size: 52,
-                          color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
-                        ),
-                        Positioned(
-                          right: 12,
-                          top: 14,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: theme.primaryColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              CupertinoIcons.sparkles,
-                              size: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Actions',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
-        ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildActionCard(
+              context,
+              'Scan Text',
+              CupertinoIcons.camera,
+              isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
+              isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Camera text scanner ready.')),
+                );
+              },
+            ),
+            _buildActionCard(
+              context,
+              'Import Book',
+              CupertinoIcons.doc,
+              isDark ? AppColors.darkSoftPink : AppColors.softPeach,
+              isDark ? AppColors.darkSoftPinkText : AppColors.textPrimary,
+              onTap: () {
+                _showAddWordDialog(context);
+              },
+            ),
+            _buildActionCard(
+              context,
+              'Paste Text',
+              CupertinoIcons.doc_on_clipboard,
+              isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
+              isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+              onTap: () {
+                _showPasteTextDialog(context);
+              },
+            ),
+            _buildActionCard(
+              context,
+              'Add Word',
+              CupertinoIcons.add,
+              isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
+              isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
+              onTap: () {
+                _showAddWordDialog(context);
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color bg,
+    Color textColor, {
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(20),
+              border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: textColor, size: 20),
+                const SizedBox(height: 6),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -517,7 +491,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 12,
-                                  color: isDark ? Colors.white90 : AppColors.textPrimary,
+                                  color: isDark ? Colors.white.withOpacity(0.9) : AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -727,7 +701,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       meaning,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         height: 1.35,
-                        color: isDark ? Colors.white87 : AppColors.textPrimary,
+                        color: isDark ? Colors.white.withOpacity(0.87) : AppColors.textPrimary,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -793,287 +767,131 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final title = activeCol?.title ?? 'The Great Gatsby';
         final desc = activeCol?.description ?? 'Chapter 3 • Vocabulary reading';
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Continue Reading',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () {
-                if (activeCol != null) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CollectionDetailScreen(
-                        collectionId: activeCol.id,
-                        title: activeCol.title,
-                        description: activeCol.description,
-                      ),
-                    ),
-                  );
-                } else {
-                  context.go('/collections');
-                }
-              },
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: isDark
-                      ? AppColors.continueReadingGradientDark
-                      : AppColors.continueReadingGradient,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isDark ? const Color(0xFF38236B) : const Color(0xFF8C71FF))
-                          .withOpacity(0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+        return InkWell(
+          onTap: () {
+            if (activeCol != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CollectionDetailScreen(
+                    collectionId: activeCol.id,
+                    title: activeCol.title,
+                    description: activeCol.description,
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.white24,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                CupertinoIcons.book,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'CURRENTLY READING',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: Colors.white70,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            '68% Done',
+              );
+            } else {
+              context.go('/collections');
+            }
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    CupertinoIcons.book_fill,
+                    color: isDark ? AppColors.darkSoftPurpleText : theme.primaryColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'CONTINUE READING',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
+                              color: theme.primaryColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 4,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white38 : AppColors.textDisabled,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '68%',
+                            style: TextStyle(
+                              color: isDark ? Colors.white60 : AppColors.textSecondary,
+                              fontSize: 10,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      desc,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white80,
-                        fontSize: 13,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                    // Progress bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: const LinearProgressIndicator(
-                        value: 0.68,
-                        backgroundColor: Colors.white24,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        minHeight: 6,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Chapter 3 • 8 Saved Words',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: const [
-                              Text(
-                                'Resume',
-                                style: TextStyle(
-                                  color: Color(0xFF6344FF),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(
-                                CupertinoIcons.play_fill,
-                                color: Color(0xFF6344FF),
-                                size: 12,
-                              ),
-                            ],
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        desc,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: isDark ? Colors.white54 : AppColors.textSecondary,
                         ),
-                      ],
-                    ),
-                  ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActions(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildActionCard(
-              context,
-              'Scan Text',
-              CupertinoIcons.camera,
-              isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
-              isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera text scanner ready.')),
-                );
-              },
-            ),
-            _buildActionCard(
-              context,
-              'Import Book',
-              CupertinoIcons.doc,
-              isDark ? AppColors.darkSoftPink : AppColors.softPeach,
-              isDark ? AppColors.darkSoftPinkText : AppColors.textPrimary,
-              onTap: () {
-                _showAddWordDialog(context);
-              },
-            ),
-            _buildActionCard(
-              context,
-              'Paste Text',
-              CupertinoIcons.doc_on_clipboard,
-              isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
-              isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
-              onTap: () {
-                _showPasteTextDialog(context);
-              },
-            ),
-            _buildActionCard(
-              context,
-              'Add Word',
-              CupertinoIcons.add,
-              isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
-              isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
-              onTap: () {
-                _showAddWordDialog(context);
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color bg,
-    Color textColor, {
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(20),
-              border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
-            ),
-            child: Column(
-              mainAxisAlignment: Alignment.center,
-              children: [
-                Icon(icon, color: textColor),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.play_fill,
+                    color: Colors.white,
+                    size: 14,
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

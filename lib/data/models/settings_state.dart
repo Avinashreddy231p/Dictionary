@@ -16,6 +16,9 @@ class SettingsState {
   final bool soundEffectsEnabled;
   final bool wordOfTheDayNotification;
   final String wordOfTheDayTime; // e.g. "09:00 AM"
+  final String geminiApiKey;
+  final bool geminiAiEnabled;
+  final String geminiModel; // "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"
 
   const SettingsState({
     this.themeMode = ThemeMode.system,
@@ -33,6 +36,9 @@ class SettingsState {
     this.soundEffectsEnabled = true,
     this.wordOfTheDayNotification = true,
     this.wordOfTheDayTime = '09:00 AM',
+    this.geminiApiKey = '',
+    this.geminiAiEnabled = true,
+    this.geminiModel = 'gemini-2.0-flash',
   });
 
   SettingsState copyWith({
@@ -51,6 +57,9 @@ class SettingsState {
     bool? soundEffectsEnabled,
     bool? wordOfTheDayNotification,
     String? wordOfTheDayTime,
+    String? geminiApiKey,
+    bool? geminiAiEnabled,
+    String? geminiModel,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
@@ -71,6 +80,9 @@ class SettingsState {
       wordOfTheDayNotification:
           wordOfTheDayNotification ?? this.wordOfTheDayNotification,
       wordOfTheDayTime: wordOfTheDayTime ?? this.wordOfTheDayTime,
+      geminiApiKey: geminiApiKey ?? this.geminiApiKey,
+      geminiAiEnabled: geminiAiEnabled ?? this.geminiAiEnabled,
+      geminiModel: geminiModel ?? this.geminiModel,
     );
   }
 }

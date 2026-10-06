@@ -37,6 +37,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   List<String> _fetchedPairings = [];
   bool _isFetchingSynonyms = false;
 
+  // Gemini AI State
+  int _aiTab = 0;
+  bool _isAiLoading = false;
+  String? _aiMnemonicResult;
+  String? _aiNuanceResult;
+  String? _aiExamplesResult;
+  String? _aiErrorMsg;
+
   @override
   void initState() {
     super.initState();
@@ -566,6 +574,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+
+                    // Gemini AI Assistant Card
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _buildGeminiAiCard(context, ref, entry),
+                    ),
+                    const SizedBox(height: 16),
 
                     // Rich Dictionary Data
                     if (entry.senses.isNotEmpty) ...[
@@ -1927,6 +1942,352 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeminiAiCard(BuildContext context, WidgetRef ref, LexicalEntry entry) {
+    final settings = ref.watch(settingsProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
+    if (!settings.geminiAiEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? primaryColor.withOpacity(0.4) : primaryColor.withOpacity(0.25),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Gemini AI Assistant',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'AI Powered',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildAiTabPill(context, label: '💡 Mnemonic', index: 0, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                  const SizedBox(width: 6),
+                  _buildAiTabPill(context, label: '⚖️ Nuance', index: 1, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                  const SizedBox(width: 6),
+                  _buildAiTabPill(context, label: '💬 Sentences', index: 2, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_aiTab == 0) ...[
+                if (_aiMnemonicResult != null)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _aiMnemonicResult!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+                      ),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    'Generate a clever visual memory trick to remember "${entry.core.headword}" forever.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: _isAiLoading
+                          ? null
+                          : () async {
+                              final apiKey = settings.geminiApiKey;
+                              if (apiKey.isEmpty) {
+                                _showApiKeyPrompt(context);
+                                return;
+                              }
+                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
+                              try {
+                                final res = await ref.read(geminiServiceProvider).generateMnemonic(
+                                  entry.core.headword,
+                                  entry.lexiLens.simpleMeaning,
+                                  apiKey: apiKey,
+                                  model: settings.geminiModel,
+                                );
+                                setState(() { _aiMnemonicResult = res; _isAiLoading = false; });
+                              } catch (e) {
+                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
+                              }
+                            },
+                      icon: _isAiLoading
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(CupertinoIcons.sparkles, size: 16),
+                      label: Text(
+                        _isAiLoading ? 'Generating Mnemonic...' : 'Generate AI Mnemonic',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ] else if (_aiTab == 1) ...[
+                if (_aiNuanceResult != null)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _aiNuanceResult!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+                      ),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    'Explain the precise emotional tone and nuance of "${entry.core.headword}" compared to synonyms.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: _isAiLoading
+                          ? null
+                          : () async {
+                              final apiKey = settings.geminiApiKey;
+                              if (apiKey.isEmpty) {
+                                _showApiKeyPrompt(context);
+                                return;
+                              }
+                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
+                              try {
+                                final res = await ref.read(geminiServiceProvider).explainNuance(
+                                  entry.core.headword,
+                                  entry.core.partOfSpeech,
+                                  entry.lexiLens.simpleMeaning,
+                                  apiKey: apiKey,
+                                  model: settings.geminiModel,
+                                );
+                                setState(() { _aiNuanceResult = res; _isAiLoading = false; });
+                              } catch (e) {
+                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
+                              }
+                            },
+                      icon: _isAiLoading
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(CupertinoIcons.sparkles, size: 16),
+                      label: Text(
+                        _isAiLoading ? 'Analyzing Nuance...' : 'Explain Nuance with Gemini',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ] else ...[
+                if (_aiExamplesResult != null)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      _aiExamplesResult!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
+                      ),
+                    ),
+                  )
+                else ...[
+                  Text(
+                    'Generate casual conversation and workplace examples for "${entry.core.headword}".',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: _isAiLoading
+                          ? null
+                          : () async {
+                              final apiKey = settings.geminiApiKey;
+                              if (apiKey.isEmpty) {
+                                _showApiKeyPrompt(context);
+                                return;
+                              }
+                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
+                              try {
+                                final res = await ref.read(geminiServiceProvider).generateContextExamples(
+                                  entry.core.headword,
+                                  entry.core.partOfSpeech,
+                                  apiKey: apiKey,
+                                  model: settings.geminiModel,
+                                );
+                                setState(() { _aiExamplesResult = res; _isAiLoading = false; });
+                              } catch (e) {
+                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
+                              }
+                            },
+                      icon: _isAiLoading
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(CupertinoIcons.sparkles, size: 16),
+                      label: Text(
+                        _isAiLoading ? 'Generating Sentences...' : 'Generate AI Sentences',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+              if (_aiErrorMsg != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _aiErrorMsg!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAiTabPill(
+    BuildContext context, {
+    required String label,
+    required int index,
+    required int activeIndex,
+    required Function(int) onSelect,
+    required Color primaryColor,
+    required bool isDark,
+  }) {
+    final isSelected = index == activeIndex;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onSelect(index),
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? primaryColor
+                : (isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showApiKeyPrompt(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Gemini API Key Required', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: const Text('Please enter your free Gemini API Key in Settings to unlock AI Mnemonics, Nuance Explanations, and Practice Sentences.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push('/settings');
+            },
+            child: const Text('Open Settings'),
+          ),
         ],
       ),
     );

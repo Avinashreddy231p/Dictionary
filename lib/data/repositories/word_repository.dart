@@ -15,8 +15,15 @@ class WordRepository {
       if (apiResults.entries.isNotEmpty) return apiResults.entries;
     } catch (_) {}
 
-    // Fallback to local database if API fails or returns no results
-    final saved = await _db.getSavedWordByWord(query);
+    // Fallback to local database
+    var saved = await _db.getSavedWordByWord(query);
+    if (saved == null) {
+      final fuzzyMatches = await _db.searchSavedWordsFuzzy(query);
+      if (fuzzyMatches.isNotEmpty) {
+        saved = fuzzyMatches.first;
+      }
+    }
+
     if (saved != null) {
       final headword = saved.word;
       final pos = saved.partOfSpeech ?? 'word';

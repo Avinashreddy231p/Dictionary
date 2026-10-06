@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../utils/fuzzy_search.dart';
 
 part 'database.g.dart';
 
@@ -149,6 +150,21 @@ class AppDatabase extends _$AppDatabase {
 
   Future<SavedWord?> getSavedWordByWord(String word) {
     return (select(savedWords)..where((t) => t.word.equals(word.toLowerCase()))).getSingleOrNull();
+  }
+
+  Future<List<SavedWord>> searchSavedWordsFuzzy(String query) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return [];
+
+    final allSaved = await select(savedWords).get();
+    final matches = FuzzySearch.rankMatches<SavedWord>(
+      query: cleanQuery,
+      candidates: allSaved,
+      wordExtractor: (w) => w.word,
+      minSimilarity: 0.40,
+    );
+
+    return matches.map((m) => m.item).toList();
   }
 
   Stream<SavedWord?> watchSavedWordByWord(String word) {

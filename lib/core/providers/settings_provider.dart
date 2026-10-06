@@ -30,6 +30,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keySoundEffects = 'settings_sound_effects';
   static const _keyWotdNotification = 'settings_wotd_notification';
   static const _keyWotdTime = 'settings_wotd_time';
+  static const _keyGeminiApiKey = 'settings_gemini_api_key';
+  static const _keyGeminiAiEnabled = 'settings_gemini_ai_enabled';
+  static const _keyGeminiModel = 'settings_gemini_model';
 
   @override
   SettingsState build() {
@@ -59,6 +62,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final soundEffectsEnabled = _prefs.getBool(_keySoundEffects) ?? true;
     final wordOfTheDayNotification = _prefs.getBool(_keyWotdNotification) ?? true;
     final wordOfTheDayTime = _prefs.getString(_keyWotdTime) ?? '09:00 AM';
+    final geminiApiKey = _prefs.getString(_keyGeminiApiKey) ?? '';
+    final geminiAiEnabled = _prefs.getBool(_keyGeminiAiEnabled) ?? true;
+    final geminiModel = _prefs.getString(_keyGeminiModel) ?? 'gemini-2.0-flash';
 
     return SettingsState(
       themeMode: themeMode,
@@ -76,6 +82,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
       soundEffectsEnabled: soundEffectsEnabled,
       wordOfTheDayNotification: wordOfTheDayNotification,
       wordOfTheDayTime: wordOfTheDayTime,
+      geminiApiKey: geminiApiKey,
+      geminiAiEnabled: geminiAiEnabled,
+      geminiModel: geminiModel,
     );
   }
 
@@ -154,6 +163,21 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.setString(_keyWotdTime, time);
   }
 
+  Future<void> setGeminiApiKey(String apiKey) async {
+    state = state.copyWith(geminiApiKey: apiKey);
+    await _prefs.setString(_keyGeminiApiKey, apiKey);
+  }
+
+  Future<void> setGeminiAiEnabled(bool enabled) async {
+    state = state.copyWith(geminiAiEnabled: enabled);
+    await _prefs.setBool(_keyGeminiAiEnabled, enabled);
+  }
+
+  Future<void> setGeminiModel(String model) async {
+    state = state.copyWith(geminiModel: model);
+    await _prefs.setString(_keyGeminiModel, model);
+  }
+
   Future<int> importVocabularyJson(String jsonString, AppDatabase db) async {
     try {
       final List<dynamic> list = jsonDecode(jsonString);
@@ -205,5 +229,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.remove(_keySoundEffects);
     await _prefs.remove(_keyWotdNotification);
     await _prefs.remove(_keyWotdTime);
+    await _prefs.remove(_keyGeminiApiKey);
+    await _prefs.remove(_keyGeminiAiEnabled);
+    await _prefs.remove(_keyGeminiModel);
   }
 }

@@ -22,6 +22,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   List<LexicalEntry> _results = [];
   List<String> _suggestions = [];
   bool _isLoading = false;
+  bool _isFuzzyMatch = false;
+  String? _correctedQuery;
+  double? _fuzzyConfidence;
   String _lastQuery = '';
 
   @override
@@ -50,6 +53,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       setState(() {
         _results = [];
         _suggestions = [];
+        _isFuzzyMatch = false;
+        _correctedQuery = null;
+        _fuzzyConfidence = null;
         _lastQuery = '';
       });
       return;
@@ -68,6 +74,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     setState(() {
       _results = searchResult.entries;
       _suggestions = searchResult.suggestions;
+      _isFuzzyMatch = searchResult.isFuzzyMatch;
+      _correctedQuery = searchResult.correctedQuery;
+      _fuzzyConfidence = searchResult.fuzzyConfidence;
       _isLoading = false;
     });
   }
@@ -115,7 +124,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Find the meaning, usage and more.',
+              'Find the meaning, usage and more with fuzzy spell correction.',
               style: theme.textTheme.bodyMedium?.copyWith(
                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                   ),
@@ -125,14 +134,81 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             const SizedBox(height: 24),
             if (_isLoading)
               Center(child: CircularProgressIndicator(color: theme.primaryColor))
-            else if (_results.isNotEmpty)
-              _buildSearchResults(context)
-            else if (_lastQuery.isNotEmpty)
+            else if (_results.isNotEmpty) ...[
+              if (_isFuzzyMatch && _correctedQuery != null)
+                _buildFuzzyMatchBanner(context),
+              _buildSearchResults(context),
+            ] else if (_lastQuery.isNotEmpty)
               _buildNoResults(context)
             else
               _buildDidYouMean(context),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFuzzyMatchBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? AppColors.darkSoftPurpleText.withOpacity(0.3) : theme.primaryColor.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            CupertinoIcons.sparkles,
+            color: isDark ? AppColors.darkSoftPurpleText : theme.primaryColor,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RichText(
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+                    ),
+                    children: [
+                      const TextSpan(text: 'Showing results for '),
+                      TextSpan(
+                        text: _correctedQuery?.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontStyle: FontStyle.italic),
+                      ),
+                      const TextSpan(text: ' (fuzzy match for "'),
+                      TextSpan(
+                        text: _lastQuery,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const TextSpan(text: '")'),
+                    ],
+                  ),
+                ),
+                if (_fuzzyConfidence != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Similarity score: ${(_fuzzyConfidence! * 100).toInt()}%',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppColors.darkSoftPurpleText.withOpacity(0.8) : theme.primaryColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -355,7 +431,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Check spelling or try these related suggestions:',
+              'Check spelling or try these fuzzy suggestions:',
               style: theme.textTheme.bodyMedium?.copyWith(
                     color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                   ),
@@ -386,7 +462,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(CupertinoIcons.search,
+                          Icon(CupertinoIcons.sparkles,
                               size: 14,
                               color: isDark ? AppColors.darkSoftYellowText : AppColors.primaryPurple),
                           const SizedBox(width: 6),
