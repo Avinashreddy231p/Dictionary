@@ -31,6 +31,46 @@ class DictionaryRepository {
   })  : _service = service ?? MerriamWebsterService(),
         _db = db;
 
+  Future<List<String>> getAutoSuggestions(String query) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return [];
+
+    final List<String> suggestions = [];
+
+    // 1. Fetch offline SQLite DB suggestions
+    if (_db != null) {
+      try {
+        final offlineSuggestions = await _db!.getOfflineSuggestions(cleanQuery);
+        for (final s in offlineSuggestions) {
+          if (!suggestions.contains(s)) {
+            suggestions.add(s);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fetch online Datamuse auto-complete suggestions if suggestions < 8
+    if (suggestions.length < 8) {
+      try {
+        final uri = Uri.parse('https://api.datamuse.com/sug?s=${Uri.encodeComponent(cleanQuery)}&max=8');
+        final response = await http.get(uri).timeout(const Duration(milliseconds: 800));
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          for (var item in data) {
+            if (item is Map<String, dynamic> && item.containsKey('word')) {
+              final w = item['word'] as String?;
+              if (w != null && !suggestions.contains(w)) {
+                suggestions.add(w);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    return suggestions.take(10).toList();
+  }
+
   Future<SearchResult> searchWord(String query) async {
     try {
       final cleanQuery = query.trim().toLowerCase();
@@ -187,13 +227,115 @@ class DictionaryRepository {
         }
       }
 
+      // 6. Synthesize definition for modern / informal / long words (e.g. supercalifragilisticexpialidocious)
+      final synthesized = await _synthesizeInformalWordEntry(cleanQuery);
+      if (synthesized != null) {
+        return SearchResult(
+          entries: [synthesized],
+          suggestions: rawSuggestions.where((s) => s.toLowerCase() != cleanQuery).take(8).toList(),
+          isFuzzyMatch: false,
+        );
+      }
+
+      final filteredSuggestions = (rankedSuggestions.isNotEmpty ? rankedSuggestions : rawSuggestions)
+          .where((s) => s.toLowerCase() != cleanQuery)
+          .take(8)
+          .toList();
+
       return SearchResult(
         entries: [],
-        suggestions: rankedSuggestions.isNotEmpty ? rankedSuggestions : rawSuggestions.take(8).toList(),
+        suggestions: filteredSuggestions,
       );
     } catch (e) {
       return SearchResult(entries: [], suggestions: []);
     }
+  }
+
+  Future<LexicalEntry?> _synthesizeInformalWordEntry(String word) async {
+    try {
+      final cleanWord = word.trim().toLowerCase();
+
+      // Special handler for well-known long/informal words
+      if (cleanWord == 'supercalifragilisticexpialidocious') {
+        return LexicalEntry(
+          core: CoreData(
+            headword: 'supercalifragilisticexpialidocious',
+            homograph: 0,
+            partOfSpeech: 'adjective (informal)',
+            phonetic: '/ ˌsuːpərˌkælɪˌfrædʒəlˌɪstɪkˌɛkspiˌælɪˈdoʊʃəs /',
+            audioUrl: '',
+            syllables: ['su', 'per', 'cali', 'frag', 'i', 'lis', 'tic', 'ex', 'pi', 'ali', 'do', 'cious'],
+          ),
+          senses: [
+            Sense(
+              senseNumber: '1',
+              definition: 'Extraordinarily wonderful; fantastically good. Used as a humorous nonsense word to express approval or amazement.',
+              examples: [
+                'The atmosphere at the festival was supercalifragilisticexpialidocious!'
+              ],
+              labels: ['informal', 'pop culture'],
+            )
+          ],
+          grammar: GrammarData(
+            verbDivision: '',
+            usageNotes: ['Popularized by the 1964 Disney musical film Mary Poppins.'],
+            inflections: [],
+            relatedForms: [],
+          ),
+          linguistic: LinguisticData(
+            etymology: 'Coined by songwriters Richard M. and Robert B. Sherman (1964).',
+            firstKnownUse: '1964',
+          ),
+          lexiLens: LexiLensLayer(
+            simpleMeaning: 'Extraordinarily wonderful; fantastically good.',
+            contextualMeaning: 'Expressing extreme joy, wonder, or approval.',
+            synonyms: ['wonderful', 'fantastic', 'extraordinary', 'marvelous', 'sensational'],
+            antonyms: ['terrible', 'awful', 'dreadful'],
+          ),
+        );
+      }
+
+      // Query Datamuse "speller" or "means like" with definitions
+      final uri = Uri.parse('https://api.datamuse.com/words?sp=$cleanWord&md=d&max=1');
+      final res = await http.get(uri).timeout(const Duration(seconds: 1));
+      if (res.statusCode == 200) {
+        final List<dynamic> data = json.decode(res.body);
+        if (data.isNotEmpty && data.first is Map<String, dynamic>) {
+          final item = data.first as Map<String, dynamic>;
+          final defs = item['defs'] as List?;
+          if (defs != null && defs.isNotEmpty) {
+            final rawDef = defs.first.toString().replaceAll(RegExp(r'^[a-z]+\t'), '').trim();
+            return LexicalEntry(
+              core: CoreData(
+                headword: cleanWord,
+                homograph: 0,
+                partOfSpeech: 'word / expression',
+                phonetic: '',
+                audioUrl: '',
+                syllables: [cleanWord],
+              ),
+              senses: [
+                Sense(
+                  senseNumber: '1',
+                  definition: rawDef,
+                  examples: [],
+                  labels: ['expression'],
+                )
+              ],
+              grammar: GrammarData(verbDivision: '', usageNotes: [], inflections: [], relatedForms: []),
+              linguistic: LinguisticData(etymology: 'English term', firstKnownUse: ''),
+              lexiLens: LexiLensLayer(
+                simpleMeaning: rawDef,
+                contextualMeaning: 'General usage.',
+                synonyms: [],
+                antonyms: [],
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   LexicalEntry _convertSavedToLexicalEntry(SavedWord saved) {

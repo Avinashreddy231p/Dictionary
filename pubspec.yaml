@@ -46,19 +46,19 @@ dependencies:
   uuid: ^4.6.0
   http: ^1.6.0
   just_audio: ^0.9.36
+  speech_to_text: ^7.0.0
+  record: ^5.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
   flutter_lints: ^6.0.0
   build_runner: ^2.16.1
   drift_dev: ^2.35.1
+
+dependency_overrides:
+  record_linux: ^1.2.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -70,6 +70,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - english Dictionary.csv
 
   # To add assets to your application, add an assets section, like this:
   # assets:

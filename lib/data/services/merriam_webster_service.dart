@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/lexical_entry.dart';
 
@@ -38,9 +39,11 @@ class MerriamWebsterService {
 
         return MwFetchResult(entries: entries, suggestions: []);
       } else {
+        debugPrint('MerriamWebsterService HTTP status: ${response.statusCode}');
         return MwFetchResult(entries: [], suggestions: []);
       }
     } catch (e) {
+      debugPrint('MerriamWebsterService network error: $e');
       return MwFetchResult(entries: [], suggestions: []);
     }
   }

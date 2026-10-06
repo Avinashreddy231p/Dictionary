@@ -186,6 +186,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
+              _buildIndexingProgressSection(context),
+              const SizedBox(height: 20),
+              _buildWordOfTheDay(context),
               const SizedBox(height: 20),
               _buildQuickActions(context),
               const SizedBox(height: 24),
@@ -260,6 +263,276 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildIndexingProgressSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final indexingState = ref.watch(indexingProgressProvider);
+    final countAsync = ref.watch(offlineWordsCountStreamProvider);
+    final dbCount = countAsync.value ?? 0;
+    final currentCount = indexingState.count > dbCount
+        ? indexingState.count
+        : (dbCount > 0 ? dbCount : indexingState.count);
+
+    final isDone = currentCount >= 100000 || (indexingState.progress >= 0.99 && !indexingState.isIndexing);
+
+    // Hide section from HomeScreen when indexing is complete or not actively running
+    if (isDone || (!indexingState.isIndexing && currentCount > 10000)) {
+      return const SizedBox.shrink();
+    }
+
+    final progressVal = (indexingState.progress > 0 ? indexingState.progress : (currentCount / 100000.0)).clamp(0.02, 1.0);
+    final percentText = '${(progressVal * 100).toInt()}%';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF3EDFF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: theme.primaryColor.withOpacity(0.3),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.primaryColor.withOpacity(isDark ? 0.2 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  CupertinoIcons.arrow_2_circlepath,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Indexing Offline Dictionary (14.5 MB)',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Loading english Dictionary.csv into local SQLite DB...',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  percentText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progressVal,
+              minHeight: 8,
+              backgroundColor: isDark ? Colors.white12 : Colors.black12,
+              valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Indexed: $currentCount / ~100,000 words',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
+              Text(
+                'Active in background',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  color: theme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWordOfTheDay(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final wotdAsync = ref.watch(wordOfTheDayProvider);
+
+    return wotdAsync.when(
+      data: (entry) {
+        if (entry == null) return const SizedBox.shrink();
+
+        final headword = entry.core.headword;
+        final pos = entry.core.partOfSpeech;
+        final phonetic = entry.core.phonetic;
+        final meaning = entry.senses.isNotEmpty ? entry.senses.first.definition : entry.lexiLens.simpleMeaning;
+        final example = entry.senses.isNotEmpty && entry.senses.first.examples.isNotEmpty
+            ? entry.senses.first.examples.first
+            : entry.lexiLens.contextualMeaning;
+
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isDark
+                  ? [const Color(0xFF231E3D), const Color(0xFF1B192E)]
+                  : [const Color(0xFFEFE8FF), const Color(0xFFE3D8FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: theme.primaryColor.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.primaryColor.withOpacity(isDark ? 0.2 : 0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () {
+              context.push('/word/$headword', extra: entry);
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(CupertinoIcons.calendar_today, size: 16, color: theme.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            'WORD OF THE DAY',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              color: theme.primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.primaryColor.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          pos,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    headword,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (phonetic.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      phonetic,
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontSize: 13,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Text(
+                    meaning,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (example.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '"$example"',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildQuickActions(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -279,32 +552,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             _buildActionCard(
               context,
-              'Scan Text',
-              CupertinoIcons.camera,
-              isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
-              isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera text scanner ready.')),
-                );
-              },
+              'Flashcards',
+              CupertinoIcons.rectangle_stack_fill,
+              isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
+              isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+              onTap: () => context.push('/flashcards'),
             ),
             _buildActionCard(
               context,
-              'Import Book',
-              CupertinoIcons.doc,
-              isDark ? AppColors.darkSoftPink : AppColors.softPeach,
-              isDark ? AppColors.darkSoftPinkText : AppColors.textPrimary,
-              onTap: () {
-                _showAddWordDialog(context);
-              },
+              'Quiz Mode',
+              CupertinoIcons.bolt_fill,
+              isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
+              isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+              onTap: () => context.push('/quiz'),
             ),
             _buildActionCard(
               context,
               'Paste Text',
               CupertinoIcons.doc_on_clipboard,
-              isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
-              isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+              isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
+              isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
               onTap: () {
                 _showPasteTextDialog(context);
               },

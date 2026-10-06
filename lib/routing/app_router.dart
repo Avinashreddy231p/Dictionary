@@ -6,6 +6,8 @@ import '../screens/word_detail/word_detail_screen.dart';
 import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/stats/stats_screen.dart';
+import '../screens/flashcards/flashcard_screen.dart';
+import '../screens/quiz/quiz_screen.dart';
 import '../screens/main_scaffold.dart';
 import '../data/models/lexical_entry.dart';
 
@@ -26,6 +28,33 @@ final goRouter = GoRouter(
       path: '/stats',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const StatsScreen(),
+    ),
+    GoRoute(
+      path: '/flashcards',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const FlashcardScreen(),
+    ),
+    GoRoute(
+      path: '/quiz',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const QuizScreen(),
+    ),
+    GoRoute(
+      path: '/word/:word',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final entry = state.extra as LexicalEntry?;
+        final wordParam = state.pathParameters['word'];
+        return WordDetailScreen(entry: entry, initialWord: wordParam);
+      },
+    ),
+    GoRoute(
+      path: '/word',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final entry = state.extra as LexicalEntry?;
+        return WordDetailScreen(entry: entry);
+      },
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -10,11 +11,21 @@ import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
+import 'widgets/pronunciation_practice_widget.dart';
+
+String _capitalize(String? input) {
+  if (input == null) return '';
+  final trimmed = input.trim();
+  if (trimmed.isEmpty) return '';
+  if (trimmed.length == 1) return trimmed.toUpperCase();
+  return '${trimmed[0].toUpperCase()}${trimmed.substring(1)}';
+}
 
 class WordDetailScreen extends ConsumerStatefulWidget {
   final LexicalEntry? entry;
+  final String? initialWord;
 
-  const WordDetailScreen({super.key, this.entry});
+  const WordDetailScreen({super.key, this.entry, this.initialWord});
 
   @override
   ConsumerState<WordDetailScreen> createState() => _WordDetailScreenState();
@@ -23,6 +34,11 @@ class WordDetailScreen extends ConsumerStatefulWidget {
 class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final TextEditingController _noteController = TextEditingController();
+
+  LexicalEntry? _fetchedEntry;
+  bool _isLoadingWord = false;
+
+  LexicalEntry? get _activeEntry => widget.entry ?? _fetchedEntry;
 
   bool _isPlaying = false;
   double _audioSpeed = 1.0;
@@ -39,10 +55,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   // Gemini AI State
   int _aiTab = 0;
-  bool _isAiLoading = false;
+  bool _isAiStreaming = false;
+  StreamSubscription<String>? _aiStreamSubscription;
   String? _aiMnemonicResult;
   String? _aiNuanceResult;
   String? _aiExamplesResult;
+  String? _aiCustomResult;
+  String? _activeCustomPromptType;
   String? _aiErrorMsg;
 
   @override
@@ -61,18 +80,34 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   @override
   void dispose() {
+    _aiStreamSubscription?.cancel();
     _audioPlayer.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
   void _loadExtraWordData() async {
-    if (widget.entry == null) return;
-    final word = widget.entry!.core.headword.toLowerCase();
+    if (widget.entry == null && widget.initialWord != null && widget.initialWord!.isNotEmpty) {
+      setState(() => _isLoadingWord = true);
+      try {
+        final repo = ref.read(wordRepositoryProvider);
+        final results = await repo.searchWord(widget.initialWord!);
+        if (results.isNotEmpty) {
+          setState(() {
+            _fetchedEntry = results.first;
+          });
+        }
+      } catch (_) {}
+      if (mounted) setState(() => _isLoadingWord = false);
+    }
+
+    final active = _activeEntry;
+    if (active == null) return;
+    final word = active.core.headword.toLowerCase();
     if (word.isEmpty) return;
 
-    final existingSyns = widget.entry!.lexiLens.synonyms;
-    final existingAnts = widget.entry!.lexiLens.antonyms;
+    final existingSyns = active.lexiLens.synonyms;
+    final existingAnts = active.lexiLens.antonyms;
 
     if (existingSyns.isNotEmpty || existingAnts.isNotEmpty) {
       setState(() {
@@ -194,11 +229,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   void _toggleSaveWord(BuildContext context, WidgetRef ref) async {
-    if (widget.entry == null) return;
+    final entry = _activeEntry;
+    if (entry == null) return;
 
     try {
       final db = ref.read(databaseProvider);
-      final entry = widget.entry!;
       final word = entry.core.headword.toLowerCase();
       final saved = await db.getSavedWordByWord(word);
 
@@ -246,8 +281,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   void _showShareSheet(BuildContext context) {
-    if (widget.entry == null) return;
-    final entry = widget.entry!;
+    final entry = _activeEntry;
+    if (entry == null) return;
 
     showModalBottomSheet(
       context: context,
@@ -488,13 +523,18 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.entry == null) {
-      return const Scaffold(
-        body: Center(child: Text('Word not found.')),
+    final entry = _activeEntry;
+    if (entry == null) {
+      if (_isLoadingWord) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
+      return Scaffold(
+        appBar: AppBar(title: const Text('Word Detail')),
+        body: const Center(child: Text('Word not found.')),
       );
     }
-
-    final entry = widget.entry!;
     final theme = Theme.of(context);
 
     final word = entry.core.headword;
@@ -530,7 +570,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     // HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
                     _FluidAnimatedCard(
                       index: cardIndex++,
-                      child: _buildHeaderAndSimpleMeaning(context, entry),
+                      child: _SafeCard(builder: () => _buildHeaderAndSimpleMeaning(context, entry)),
                     ),
                     const SizedBox(height: 20),
 
@@ -538,7 +578,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     if (isSaved) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildMasteryCard(context, ref, word),
+                        child: _SafeCard(builder: () => _buildMasteryCard(context, ref, word)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -546,14 +586,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     // Context Card
                     _FluidAnimatedCard(
                       index: cardIndex++,
-                      child: _buildContextCard(context, word),
+                      child: _SafeCard(builder: () => _buildContextCard(context, word)),
                     ),
                     const SizedBox(height: 16),
 
                     if (allExamples.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildExampleCard(context, allExamples),
+                        child: _SafeCard(builder: () => _buildExampleCard(context, allExamples)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -561,16 +601,29 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     if (entry.core.syllables.length > 1) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildAnatomyCard(context),
+                        child: _SafeCard(builder: () => _buildAnatomyCard(context)),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                     ],
+
+                    // Pronunciation Practice & Voice Comparator
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _SafeCard(
+                        builder: () => PronunciationPracticeWidget(
+                          headword: word,
+                          phonetic: entry.core.phonetic,
+                          audioUrl: entry.core.audioUrl,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
                     // Personal Reader Notes (if saved)
                     if (isSaved && savedWord != null) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildPersonalNoteCard(context, savedWord),
+                        child: _SafeCard(builder: () => _buildPersonalNoteCard(context, savedWord)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -578,7 +631,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     // Gemini AI Assistant Card
                     _FluidAnimatedCard(
                       index: cardIndex++,
-                      child: _buildGeminiAiCard(context, ref, entry),
+                      child: _SafeCard(builder: () => _buildGeminiAiCard(context, ref, entry)),
                     ),
                     const SizedBox(height: 16),
 
@@ -586,7 +639,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     if (entry.senses.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildFullDefinitionsCard(context, entry.senses),
+                        child: _SafeCard(builder: () => _buildFullDefinitionsCard(context, entry.senses)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -594,7 +647,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     if (_fetchedPairings.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildPairingsCard(context),
+                        child: _SafeCard(builder: () => _buildPairingsCard(context)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -603,7 +656,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                         entry.grammar.usageNotes.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildUsageGrammarCard(context),
+                        child: _SafeCard(builder: () => _buildUsageGrammarCard(context)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -611,7 +664,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     if (entry.grammar.inflections.isNotEmpty || entry.grammar.relatedForms.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildWordFamilyCard(context),
+                        child: _SafeCard(builder: () => _buildWordFamilyCard(context)),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -619,14 +672,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     // Synonyms & Antonyms
                     _FluidAnimatedCard(
                       index: cardIndex++,
-                      child: _buildRelationshipsCard(context),
+                      child: _SafeCard(builder: () => _buildRelationshipsCard(context)),
                     ),
                     const SizedBox(height: 16),
 
                     if (entry.linguistic.etymology.isNotEmpty) ...[
                       _FluidAnimatedCard(
                         index: cardIndex++,
-                        child: _buildEtymologyCard(context, entry.linguistic),
+                        child: _SafeCard(builder: () => _buildEtymologyCard(context, entry.linguistic)),
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -634,7 +687,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     // Bottom Action
                     _FluidAnimatedCard(
                       index: cardIndex++,
-                      child: _buildSavedButton(context, ref, isSaved),
+                      child: _SafeCard(builder: () => _buildSavedButton(context, ref, isSaved)),
                     ),
                     const SizedBox(height: 48),
                   ],
@@ -736,8 +789,9 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final blobColor = isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow;
     final headerTextColor = isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary;
 
-    final formattedMeaning = simpleMeaning.isNotEmpty
-        ? (simpleMeaning.replaceFirst(simpleMeaning[0], simpleMeaning[0].toUpperCase()) + (simpleMeaning.endsWith('.') ? '' : '.'))
+    final capMeaning = _capitalize(simpleMeaning);
+    final formattedMeaning = capMeaning.isNotEmpty
+        ? (capMeaning + (capMeaning.endsWith('.') ? '' : '.'))
         : 'Vocabulary term';
 
     return GestureDetector(
@@ -1181,10 +1235,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   Widget _buildExampleCard(BuildContext context, List<String> examples) {
     if (examples.isEmpty) return const SizedBox.shrink();
+    final exampleText = examples.first.trim();
+    if (exampleText.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final exampleText = examples.first;
+    final capExample = _capitalize(exampleText);
 
     return Container(
       width: double.infinity,
@@ -1210,7 +1266,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '"${exampleText.replaceFirst(exampleText[0], exampleText[0].toUpperCase())}"',
+            '"$capExample"',
             style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark
                       ? AppColors.darkSoftPinkText.withOpacity(0.9)
@@ -1226,11 +1282,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   // SCROLLABLE "WORD ANATOMY" TO PREVENT COMPROMISING MULTI-SYLLABLE WORDS
   Widget _buildAnatomyCard(BuildContext context) {
-    if (widget.entry == null || widget.entry!.core.syllables.length < 2) return const SizedBox.shrink();
+    final entry = _activeEntry;
+    if (entry == null || entry.core.syllables.length < 2) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final syllables = widget.entry!.core.syllables;
+    final syllables = entry.core.syllables;
 
     final colors = isDark
         ? [AppColors.darkSoftGreen, AppColors.darkSoftBlue, AppColors.darkSoftPurple]
@@ -1530,9 +1587,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   Widget _buildUsageGrammarCard(BuildContext context) {
+    final entry = _activeEntry;
+    if (entry == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final grammar = widget.entry!.grammar;
+    final grammar = entry.grammar;
 
     return Container(
       width: double.infinity,
@@ -1597,9 +1656,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   Widget _buildWordFamilyCard(BuildContext context) {
+    final entry = _activeEntry;
+    if (entry == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final grammar = widget.entry!.grammar;
+    final grammar = entry.grammar;
 
     return Container(
       width: double.infinity,
@@ -1950,6 +2011,288 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
+  void _stopAiStream() {
+    _aiStreamSubscription?.cancel();
+    _aiStreamSubscription = null;
+    if (mounted) {
+      setState(() {
+        _isAiStreaming = false;
+      });
+    }
+  }
+
+  void _startAiStream({
+    required BuildContext context,
+    required WidgetRef ref,
+    required Stream<String> Function(String apiKey, String? model) streamBuilder,
+    required void Function(String chunk, bool isFirst) onChunk,
+  }) {
+    final settings = ref.read(settingsProvider);
+    final apiKey = settings.geminiApiKey;
+    if (apiKey.isEmpty) {
+      _showApiKeyPrompt(context);
+      return;
+    }
+
+    _stopAiStream();
+
+    setState(() {
+      _isAiStreaming = true;
+      _aiErrorMsg = null;
+    });
+
+    bool isFirst = true;
+
+    try {
+      final stream = streamBuilder(apiKey, settings.geminiModel);
+      _aiStreamSubscription = stream.listen(
+        (chunk) {
+          if (mounted) {
+            setState(() {
+              onChunk(chunk, isFirst);
+              isFirst = false;
+            });
+          }
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              _aiErrorMsg = e.toString().replaceAll('Exception: ', '');
+              _isAiStreaming = false;
+            });
+          }
+        },
+        onDone: () {
+          if (mounted) {
+            setState(() {
+              _isAiStreaming = false;
+            });
+          }
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _aiErrorMsg = e.toString().replaceAll('Exception: ', '');
+          _isAiStreaming = false;
+        });
+      }
+    }
+  }
+
+  void _triggerMnemonicStream(BuildContext context, WidgetRef ref, LexicalEntry entry) {
+    _startAiStream(
+      context: context,
+      ref: ref,
+      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamMnemonic(
+        entry.core.headword,
+        entry.lexiLens.simpleMeaning,
+        apiKey: apiKey,
+        model: model,
+      ),
+      onChunk: (chunk, isFirst) {
+        if (isFirst) {
+          _aiMnemonicResult = chunk;
+        } else {
+          _aiMnemonicResult = (_aiMnemonicResult ?? '') + chunk;
+        }
+      },
+    );
+  }
+
+  void _triggerNuanceStream(BuildContext context, WidgetRef ref, LexicalEntry entry) {
+    _startAiStream(
+      context: context,
+      ref: ref,
+      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamExplainNuance(
+        entry.core.headword,
+        entry.core.partOfSpeech,
+        entry.lexiLens.simpleMeaning,
+        apiKey: apiKey,
+        model: model,
+      ),
+      onChunk: (chunk, isFirst) {
+        if (isFirst) {
+          _aiNuanceResult = chunk;
+        } else {
+          _aiNuanceResult = (_aiNuanceResult ?? '') + chunk;
+        }
+      },
+    );
+  }
+
+  void _triggerExamplesStream(BuildContext context, WidgetRef ref, LexicalEntry entry) {
+    _startAiStream(
+      context: context,
+      ref: ref,
+      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamContextExamples(
+        entry.core.headword,
+        entry.core.partOfSpeech,
+        apiKey: apiKey,
+        model: model,
+      ),
+      onChunk: (chunk, isFirst) {
+        if (isFirst) {
+          _aiExamplesResult = chunk;
+        } else {
+          _aiExamplesResult = (_aiExamplesResult ?? '') + chunk;
+        }
+      },
+    );
+  }
+
+  void _triggerCustomStream(BuildContext context, WidgetRef ref, LexicalEntry entry, String promptType) {
+    _activeCustomPromptType = promptType;
+    _startAiStream(
+      context: context,
+      ref: ref,
+      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamCustomPrompt(
+        entry.core.headword,
+        promptType,
+        apiKey: apiKey,
+        model: model,
+      ),
+      onChunk: (chunk, isFirst) {
+        if (isFirst) {
+          _aiCustomResult = chunk;
+        } else {
+          _aiCustomResult = (_aiCustomResult ?? '') + chunk;
+        }
+      },
+    );
+  }
+
+  Widget _buildStreamingResultCard({
+    required BuildContext context,
+    required String? text,
+    required Color bgColor,
+    required Color textColor,
+    required Color primaryColor,
+    required bool isStreaming,
+    required VoidCallback onStop,
+    required VoidCallback onRegenerate,
+  }) {
+    final cleanText = (text ?? '').trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: TextSpan(
+              text: cleanText,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.45,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+              children: [
+                if (isStreaming)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: Container(
+                      margin: const EdgeInsets.only(left: 4),
+                      width: 8,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (isStreaming) ...[
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent, width: 1.2),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: onStop,
+                  icon: const Icon(CupertinoIcons.stop_fill, size: 12),
+                  label: const Text('Stop', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ] else if (cleanText.isNotEmpty) ...[
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(CupertinoIcons.doc_on_doc, size: 16),
+                  tooltip: 'Copy',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: cleanText));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Copied to clipboard!'),
+                        duration: Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(CupertinoIcons.refresh, size: 16),
+                  tooltip: 'Regenerate',
+                  onPressed: onRegenerate,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickPromptChip(
+    BuildContext context, {
+    required String label,
+    required String type,
+    required LexicalEntry entry,
+    required WidgetRef ref,
+    required Color primaryColor,
+    required bool isDark,
+  }) {
+    final isSelected = _activeCustomPromptType == type;
+    return ActionChip(
+      avatar: isSelected && _isAiStreaming
+          ? SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor),
+            )
+          : null,
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+          color: isSelected ? primaryColor : (isDark ? Colors.white70 : Colors.black87),
+        ),
+      ),
+      backgroundColor: isSelected
+          ? primaryColor.withOpacity(0.15)
+          : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.3)),
+      side: BorderSide(
+        color: isSelected ? primaryColor : (isDark ? AppColors.darkBorder : AppColors.border),
+      ),
+      onPressed: _isAiStreaming ? null : () => _triggerCustomStream(context, ref, entry, type),
+    );
+  }
+
   Widget _buildGeminiAiCard(BuildContext context, WidgetRef ref, LexicalEntry entry) {
     final settings = ref.watch(settingsProvider);
     final theme = Theme.of(context);
@@ -1957,7 +2300,50 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final primaryColor = theme.primaryColor;
 
     if (!settings.geminiAiEnabled) {
-      return const SizedBox.shrink();
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF3EDFF),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: primaryColor.withOpacity(0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('AI Mnemonics & Deep Insights', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text('Unlock AI Mnemonics, Shades of Meaning & Examples in Settings.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => context.push('/settings'),
+              child: const Text('Unlock'),
+            ),
+          ],
+        ),
+      );
     }
 
     return Container(
@@ -1978,262 +2364,243 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           ),
         ],
       ),
-      child: StatefulBuilder(
-        builder: (context, setState) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       'Gemini AI Assistant',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(12),
+                    Text(
+                      _isAiStreaming ? 'Live Streaming AI Response...' : 'Interactive Real-Time Insights',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _isAiStreaming ? primaryColor : (isDark ? Colors.white54 : Colors.grey.shade600),
+                      ),
                     ),
-                    child: const Text(
-                      'AI Powered',
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isAiStreaming) ...[
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    const Text(
+                      'Realtime AI',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w900,
                         fontSize: 10,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  _buildAiTabPill(context, label: '💡 Mnemonic', index: 0, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
-                  const SizedBox(width: 6),
-                  _buildAiTabPill(context, label: '⚖️ Nuance', index: 1, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
-                  const SizedBox(width: 6),
-                  _buildAiTabPill(context, label: '💬 Sentences', index: 2, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_aiTab == 0) ...[
-                if (_aiMnemonicResult != null)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      _aiMnemonicResult!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
-                      ),
-                    ),
-                  )
-                else ...[
-                  Text(
-                    'Generate a clever visual memory trick to remember "${entry.core.headword}" forever.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _isAiLoading
-                          ? null
-                          : () async {
-                              final apiKey = settings.geminiApiKey;
-                              if (apiKey.isEmpty) {
-                                _showApiKeyPrompt(context);
-                                return;
-                              }
-                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
-                              try {
-                                final res = await ref.read(geminiServiceProvider).generateMnemonic(
-                                  entry.core.headword,
-                                  entry.lexiLens.simpleMeaning,
-                                  apiKey: apiKey,
-                                  model: settings.geminiModel,
-                                );
-                                setState(() { _aiMnemonicResult = res; _isAiLoading = false; });
-                              } catch (e) {
-                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
-                              }
-                            },
-                      icon: _isAiLoading
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(CupertinoIcons.sparkles, size: 16),
-                      label: Text(
-                        _isAiLoading ? 'Generating Mnemonic...' : 'Generate AI Mnemonic',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-                ],
-              ] else if (_aiTab == 1) ...[
-                if (_aiNuanceResult != null)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      _aiNuanceResult!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
-                      ),
-                    ),
-                  )
-                else ...[
-                  Text(
-                    'Explain the precise emotional tone and nuance of "${entry.core.headword}" compared to synonyms.',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _isAiLoading
-                          ? null
-                          : () async {
-                              final apiKey = settings.geminiApiKey;
-                              if (apiKey.isEmpty) {
-                                _showApiKeyPrompt(context);
-                                return;
-                              }
-                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
-                              try {
-                                final res = await ref.read(geminiServiceProvider).explainNuance(
-                                  entry.core.headword,
-                                  entry.core.partOfSpeech,
-                                  entry.lexiLens.simpleMeaning,
-                                  apiKey: apiKey,
-                                  model: settings.geminiModel,
-                                );
-                                setState(() { _aiNuanceResult = res; _isAiLoading = false; });
-                              } catch (e) {
-                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
-                              }
-                            },
-                      icon: _isAiLoading
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(CupertinoIcons.sparkles, size: 16),
-                      label: Text(
-                        _isAiLoading ? 'Analyzing Nuance...' : 'Explain Nuance with Gemini',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-                ],
-              ] else ...[
-                if (_aiExamplesResult != null)
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.6),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      _aiExamplesResult!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
-                      ),
-                    ),
-                  )
-                else ...[
-                  Text(
-                    'Generate casual conversation and workplace examples for "${entry.core.headword}".',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _isAiLoading
-                          ? null
-                          : () async {
-                              final apiKey = settings.geminiApiKey;
-                              if (apiKey.isEmpty) {
-                                _showApiKeyPrompt(context);
-                                return;
-                              }
-                              setState(() { _isAiLoading = true; _aiErrorMsg = null; });
-                              try {
-                                final res = await ref.read(geminiServiceProvider).generateContextExamples(
-                                  entry.core.headword,
-                                  entry.core.partOfSpeech,
-                                  apiKey: apiKey,
-                                  model: settings.geminiModel,
-                                );
-                                setState(() { _aiExamplesResult = res; _isAiLoading = false; });
-                              } catch (e) {
-                                setState(() { _aiErrorMsg = e.toString().replaceAll('Exception: ', ''); _isAiLoading = false; });
-                              }
-                            },
-                      icon: _isAiLoading
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Icon(CupertinoIcons.sparkles, size: 16),
-                      label: Text(
-                        _isAiLoading ? 'Generating Sentences...' : 'Generate AI Sentences',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-              if (_aiErrorMsg != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _aiErrorMsg!,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600),
+                  ],
                 ),
-              ],
+              ),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildAiTabPill(context, label: '💡 Mnemonic', index: 0, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                const SizedBox(width: 6),
+                _buildAiTabPill(context, label: '⚖️ Nuance', index: 1, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                const SizedBox(width: 6),
+                _buildAiTabPill(context, label: '💬 Sentences', index: 2, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+                const SizedBox(width: 6),
+                _buildAiTabPill(context, label: '⚡ Quick AI', index: 3, activeIndex: _aiTab, onSelect: (i) => setState(() => _aiTab = i), primaryColor: primaryColor, isDark: isDark),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_aiTab == 0) ...[
+            if (_aiMnemonicResult != null)
+              _buildStreamingResultCard(
+                context: context,
+                text: _aiMnemonicResult,
+                bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.6),
+                textColor: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+                primaryColor: primaryColor,
+                isStreaming: _isAiStreaming,
+                onStop: _stopAiStream,
+                onRegenerate: () => _triggerMnemonicStream(context, ref, entry),
+              )
+            else ...[
+              Text(
+                'Generate a clever visual memory trick to remember "${entry.core.headword}" forever.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isAiStreaming ? null : () => _triggerMnemonicStream(context, ref, entry),
+                  icon: _isAiStreaming
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(CupertinoIcons.sparkles, size: 16),
+                  label: Text(
+                    _isAiStreaming ? 'Streaming Mnemonic...' : 'Generate AI Mnemonic',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ] else if (_aiTab == 1) ...[
+            if (_aiNuanceResult != null)
+              _buildStreamingResultCard(
+                context: context,
+                text: _aiNuanceResult,
+                bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.6),
+                textColor: isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+                primaryColor: primaryColor,
+                isStreaming: _isAiStreaming,
+                onStop: _stopAiStream,
+                onRegenerate: () => _triggerNuanceStream(context, ref, entry),
+              )
+            else ...[
+              Text(
+                'Explain the precise emotional tone and nuance of "${entry.core.headword}" compared to synonyms.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isAiStreaming ? null : () => _triggerNuanceStream(context, ref, entry),
+                  icon: _isAiStreaming
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(CupertinoIcons.sparkles, size: 16),
+                  label: Text(
+                    _isAiStreaming ? 'Streaming Nuance...' : 'Explain Nuance with Gemini',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ] else if (_aiTab == 2) ...[
+            if (_aiExamplesResult != null)
+              _buildStreamingResultCard(
+                context: context,
+                text: _aiExamplesResult,
+                bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.6),
+                textColor: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
+                primaryColor: primaryColor,
+                isStreaming: _isAiStreaming,
+                onStop: _stopAiStream,
+                onRegenerate: () => _triggerExamplesStream(context, ref, entry),
+              )
+            else ...[
+              Text(
+                'Generate casual conversation and workplace examples for "${entry.core.headword}".',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isAiStreaming ? null : () => _triggerExamplesStream(context, ref, entry),
+                  icon: _isAiStreaming
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(CupertinoIcons.sparkles, size: 16),
+                  label: Text(
+                    _isAiStreaming ? 'Streaming Sentences...' : 'Generate AI Sentences',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ] else ...[
+            Text(
+              'Tap an interactive prompt to stream real-time insights for "${entry.core.headword}":',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildQuickPromptChip(context, label: '👶 Explain Simply', type: 'simple', entry: entry, ref: ref, primaryColor: primaryColor, isDark: isDark),
+                _buildQuickPromptChip(context, label: '📖 Micro-Story', type: 'story', entry: entry, ref: ref, primaryColor: primaryColor, isDark: isDark),
+                _buildQuickPromptChip(context, label: '🔤 Synonyms & Tone', type: 'synonyms', entry: entry, ref: ref, primaryColor: primaryColor, isDark: isDark),
+                _buildQuickPromptChip(context, label: '🏛️ Etymology', type: 'etymology', entry: entry, ref: ref, primaryColor: primaryColor, isDark: isDark),
+              ],
+            ),
+            if (_aiCustomResult != null) ...[
+              const SizedBox(height: 14),
+              _buildStreamingResultCard(
+                context: context,
+                text: _aiCustomResult,
+                bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withOpacity(0.6),
+                textColor: isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
+                primaryColor: primaryColor,
+                isStreaming: _isAiStreaming,
+                onStop: _stopAiStream,
+                onRegenerate: () {
+                  if (_activeCustomPromptType != null) {
+                    _triggerCustomStream(context, ref, entry, _activeCustomPromptType!);
+                  }
+                },
+              ),
+            ],
+          ],
+          if (_aiErrorMsg != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _aiErrorMsg!,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2248,32 +2615,30 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     required bool isDark,
   }) {
     final isSelected = index == activeIndex;
-    return Expanded(
-      child: InkWell(
-        onTap: () => onSelect(index),
-        borderRadius: BorderRadius.circular(12),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
+    return InkWell(
+      onTap: () => onSelect(index),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? primaryColor
+              : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
             color: isSelected
                 ? primaryColor
-                : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4)),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? primaryColor
-                  : (isDark ? AppColors.darkBorder : AppColors.border),
-            ),
+                : (isDark ? AppColors.darkBorder : AppColors.border),
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
-            ),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
           ),
         ),
       ),
@@ -2365,64 +2730,44 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 }
 
 // FLUID STAGGERED ENTRANCE ANIMATED WIDGET
-class _FluidAnimatedCard extends StatefulWidget {
+class _FluidAnimatedCard extends StatelessWidget {
   final Widget child;
   final int index;
 
   const _FluidAnimatedCard({required this.child, required this.index});
 
   @override
-  State<_FluidAnimatedCard> createState() => _FluidAnimatedCardState();
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(milliseconds: 300 + (index * 30).clamp(0, 300)),
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 8 * (1.0 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
 }
 
-class _FluidAnimatedCardState extends State<_FluidAnimatedCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _SafeCard extends StatelessWidget {
+  final Widget Function() builder;
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-
-    // Stagger delay based on card index
-    final startDelay = (widget.index * 0.08).clamp(0.0, 0.6);
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Interval(startDelay, 1.0, curve: Curves.easeOut),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.12),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Interval(startDelay, 1.0, curve: Curves.easeOutCubic),
-    ));
-
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  const _SafeCard({required this.builder});
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
-    );
+    try {
+      return builder();
+    } catch (e, stack) {
+      debugPrint('Error building WordDetail card: $e\n$stack');
+      return const SizedBox.shrink();
+    }
   }
 }
 

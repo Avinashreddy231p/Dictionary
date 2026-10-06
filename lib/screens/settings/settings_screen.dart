@@ -1318,8 +1318,32 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: Consumer(
               builder: (context, ref, child) {
                 final countAsync = ref.watch(offlineWordsCountStreamProvider);
+                final indexingState = ref.watch(indexingProgressProvider);
                 return countAsync.when(
-                  data: (count) => Text('$count words indexed • Offline lookup active'),
+                  data: (count) {
+                    final displayCount = count > indexingState.count ? count : indexingState.count;
+                    final isComplete = displayCount >= 100000;
+                    if (isComplete) {
+                      return Row(
+                        children: [
+                          const Icon(CupertinoIcons.checkmark_seal_fill, color: Colors.green, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '$displayCount words indexed (Complete) • Offline lookup active',
+                              style: TextStyle(
+                                color: Colors.green.shade400,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return Text('$displayCount words indexed • Offline lookup active');
+                  },
                   loading: () => const Text('Offline lookup active'),
                   error: (_, __) => const Text('Offline lookup active'),
                 );
@@ -1337,23 +1361,54 @@ class SettingsScreen extends ConsumerWidget {
               },
             ),
           ),
-          ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(CupertinoIcons.arrow_2_circlepath,
-                  color: primaryColor, size: 20),
-            ),
-            title: const Text(
-              'Sync Full English Dictionary CSV',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-            ),
-            subtitle: const Text('Download 100k+ words dataset from GitHub'),
-            onTap: () => _syncOfflineDatabase(context, ref),
+          Consumer(
+            builder: (context, ref, child) {
+              final countAsync = ref.watch(offlineWordsCountStreamProvider);
+              final indexingState = ref.watch(indexingProgressProvider);
+              final dbCount = countAsync.value ?? 0;
+              final currentCount = dbCount > indexingState.count ? dbCount : indexingState.count;
+              final isComplete = currentCount >= 100000;
+
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isComplete ? Colors.green.withOpacity(0.15) : primaryColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isComplete ? CupertinoIcons.checkmark_seal_fill : CupertinoIcons.arrow_2_circlepath,
+                    color: isComplete ? Colors.green : primaryColor,
+                    size: 20,
+                  ),
+                ),
+                title: const Text(
+                  'Sync Full English Dictionary CSV',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+                subtitle: isComplete
+                    ? Row(
+                        children: [
+                          const Icon(CupertinoIcons.checkmark_alt, color: Colors.green, size: 14),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              'Dataset fully synced & ready (100k+ words)',
+                              style: TextStyle(
+                                color: Colors.green.shade400,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      )
+                    : const Text('Download 100k+ words dataset from GitHub'),
+                onTap: () => _syncOfflineDatabase(context, ref),
+              );
+            },
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
           ListTile(
@@ -1730,7 +1785,37 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
+  void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
+    final currentDbCount = await ref.read(databaseProvider).getOfflineWordsCount();
+    if (currentDbCount >= 100000 && context.mounted) {
+      final shouldReSync = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(CupertinoIcons.checkmark_seal_fill, color: Colors.green),
+              SizedBox(width: 10),
+              Text('Database Complete', style: TextStyle(fontWeight: FontWeight.w800)),
+            ],
+          ),
+          content: Text('Your offline database is already 100% complete with $currentDbCount words indexed.\n\nDo you want to force re-sync the dataset?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Re-sync Dataset'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldReSync != true) return;
+    }
+
     double progress = 0.0;
     StateSetter? dialogSetState;
 
@@ -1738,7 +1823,7 @@ void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        return StatefulWidget(
+        return StatefulBuilder(
           builder: (context, setState) {
             dialogSetState = setState;
             return AlertDialog(
@@ -1752,7 +1837,7 @@ void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Downloading English Dictionary CSV dataset from GitHub and populating offline database...'),
                   const SizedBox(height: 16),
@@ -1772,8 +1857,8 @@ void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
 
     try {
       final service = ref.read(offlineDictionaryServiceProvider);
-      final count = await service.downloadAndSyncDatabase(
-        onProgress: (p) {
+      final count = await service.syncFromLocalOrRemote(
+        onProgress: (p, count) {
           if (dialogSetState != null) {
             dialogSetState!(() {
               progress = p;
@@ -1791,7 +1876,6 @@ void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
         _showFeedback(context, 'Sync failed: $e');
       }
     }
-  }
   }
 }
 

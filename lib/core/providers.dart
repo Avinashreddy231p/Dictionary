@@ -7,12 +7,73 @@ import '../data/services/offline_dictionary_service.dart';
 import 'providers/settings_provider.dart';
 
 export 'providers/settings_provider.dart';
+export 'providers/word_of_the_day_provider.dart';
 export '../data/services/gemini_service.dart';
+
+class IndexingProgressState {
+  final bool isIndexing;
+  final double progress;
+  final int count;
+  final String status;
+
+  const IndexingProgressState({
+    this.isIndexing = false,
+    this.progress = 0.0,
+    this.count = 0,
+    this.status = '',
+  });
+
+  IndexingProgressState copyWith({
+    bool? isIndexing,
+    double? progress,
+    int? count,
+    String? status,
+  }) {
+    return IndexingProgressState(
+      isIndexing: isIndexing ?? this.isIndexing,
+      progress: progress ?? this.progress,
+      count: count ?? this.count,
+      status: status ?? this.status,
+    );
+  }
+}
+
+class IndexingProgressNotifier extends Notifier<IndexingProgressState> {
+  @override
+  IndexingProgressState build() {
+    return const IndexingProgressState();
+  }
+
+  void setIndexing({required bool isIndexing, double progress = 0.0, int count = 0, String status = ''}) {
+    state = IndexingProgressState(
+      isIndexing: isIndexing,
+      progress: progress,
+      count: count,
+      status: status,
+    );
+  }
+}
+
+final indexingProgressProvider = NotifierProvider<IndexingProgressNotifier, IndexingProgressState>(
+  IndexingProgressNotifier.new,
+);
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  // Ensure database is seeded on startup
-  db.seedDatabase();
+  // Ensure database is seeded on startup and CSV dictionary dataset is auto-synced
+  db.seedDatabase().then((_) {
+    final service = OfflineDictionaryService(db);
+    service.autoSyncIfNeeded(
+      onProgress: (p, count) {
+        ref.read(indexingProgressProvider.notifier).setIndexing(
+          isIndexing: p < 1.0,
+          progress: p,
+          count: count,
+          status: p < 1.0 ? 'Indexing local english Dictionary.csv dataset...' : 'Offline Dictionary Ready!',
+        );
+      },
+    );
+  });
   ref.onDispose(db.close);
   return db;
 });

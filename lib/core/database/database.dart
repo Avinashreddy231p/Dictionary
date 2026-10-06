@@ -333,33 +333,63 @@ class AppDatabase extends _$AppDatabase {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) return null;
 
-    final wordRow = await (select(words)..where((t) => t.word.equals(cleanQuery))).getSingleOrNull();
-    if (wordRow == null) return null;
+    // 1. Case-insensitive exact match or headword variant match (e.g. "Run", "run", "run, v.", "run.")
+    List<Word> wordRows = await (select(words)
+      ..where((t) =>
+          t.word.lower().equals(cleanQuery) |
+          t.word.like('$cleanQuery') |
+          t.word.like('$cleanQuery,%') |
+          t.word.like('$cleanQuery.%'))
+      ..limit(10)).get();
 
-    final defRows = await (select(definitions)..where((t) => t.wordId.equals(wordRow.id))).get();
+    // 2. Substring match fallback
+    if (wordRows.isEmpty) {
+      wordRows = await (select(words)
+        ..where((t) => t.word.like('%$cleanQuery%'))
+        ..limit(5)).get();
+    }
 
-    final senses = defRows.map((d) {
-      return Sense(
-        senseNumber: d.senseNumber ?? '1',
-        definition: d.definition,
-        examples: [],
-        labels: d.labels?.split(',').map((e) => e.trim()).toList() ?? [],
-      );
-    }).toList();
+    if (wordRows.isEmpty) return null;
 
-    final mainDef = wordRow.simpleMeaning ?? (senses.isNotEmpty ? senses.first.definition : 'No offline definition available.');
+    final primaryWord = wordRows.first;
+
+    // Aggregate senses across all matching rows
+    final List<Sense> allSenses = [];
+    for (final wRow in wordRows) {
+      final defRows = await (select(definitions)..where((t) => t.wordId.equals(wRow.id))).get();
+      for (final d in defRows) {
+        allSenses.add(Sense(
+          senseNumber: d.senseNumber ?? '${allSenses.length + 1}',
+          definition: d.definition,
+          examples: [],
+          labels: d.labels?.split(',').map((e) => e.trim()).toList() ?? [],
+        ));
+      }
+      if (wRow.simpleMeaning != null && wRow.simpleMeaning!.isNotEmpty) {
+        if (!allSenses.any((s) => s.definition == wRow.simpleMeaning)) {
+          allSenses.add(Sense(
+            senseNumber: '${allSenses.length + 1}',
+            definition: wRow.simpleMeaning!,
+            examples: [],
+            labels: [],
+          ));
+        }
+      }
+    }
+
+    final mainDef = allSenses.isNotEmpty ? allSenses.first.definition : (primaryWord.simpleMeaning ?? 'No offline definition available.');
 
     return LexicalEntry(
       core: CoreData(
-        headword: wordRow.word,
+        headword: primaryWord.word,
         homograph: 0,
-        partOfSpeech: wordRow.partOfSpeech ?? 'word',
-        phonetic: wordRow.phonetic ?? '',
+        partOfSpeech: primaryWord.partOfSpeech ?? 'word',
+        phonetic: primaryWord.phonetic ?? '',
         audioUrl: '',
-        syllables: wordRow.syllables?.split('*') ?? [wordRow.word],
+        syllables: primaryWord.syllables?.split('*') ?? [primaryWord.word],
       ),
-      senses: senses.isNotEmpty
-          ? senses
+      senses: allSenses.isNotEmpty
+          ? allSenses
           : [
               Sense(
                 senseNumber: '1',
@@ -375,12 +405,12 @@ class AppDatabase extends _$AppDatabase {
         relatedForms: [],
       ),
       linguistic: LinguisticData(
-        etymology: wordRow.etymology ?? 'Offline English Dictionary Dataset',
-        firstKnownUse: wordRow.firstKnownUse ?? '',
+        etymology: primaryWord.etymology ?? 'English Dictionary',
+        firstKnownUse: primaryWord.firstKnownUse ?? '',
       ),
       lexiLens: LexiLensLayer(
         simpleMeaning: mainDef,
-        contextualMeaning: wordRow.contextualMeaning ?? 'Offline backup dictionary definition.',
+        contextualMeaning: primaryWord.contextualMeaning ?? 'Offline backup dictionary definition.',
         synonyms: [],
         antonyms: [],
       ),
@@ -391,16 +421,135 @@ class AppDatabase extends _$AppDatabase {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) return [];
 
-    final wordRows = await (select(words)
-      ..where((t) => t.word.like('%$cleanQuery%'))
-      ..limit(8)).get();
+    final Map<String, String> candidateWords = {};
+
+    // 1. Direct prefix / substring matches in CSV Words table
+    final directRows = await (select(words)
+      ..where((t) => t.word.like('$cleanQuery%') | t.word.like('%$cleanQuery%'))
+      ..limit(30)).get();
+
+    for (final r in directRows) {
+      candidateWords[r.word.toLowerCase()] = r.word;
+    }
+
+    // 2. Misspelling candidate retrieval for typos (shares first letter & similar length)
+    if (candidateWords.length < 15 && cleanQuery.length >= 2) {
+      final firstLetter = cleanQuery[0];
+      final minLen = (cleanQuery.length - 2).clamp(1, 100);
+      final maxLen = cleanQuery.length + 3;
+
+      final typoRows = await (select(words)
+        ..where((t) => t.word.like('$firstLetter%') & t.word.length.isBetweenValues(minLen, maxLen))
+        ..limit(100)).get();
+
+      for (final r in typoRows) {
+        candidateWords[r.word.toLowerCase()] = r.word;
+      }
+    }
+
+    if (candidateWords.isEmpty) return [];
+
+    // 3. Rank candidates using FuzzySearch (Levenshtein distance & similarity)
+    final matches = FuzzySearch.rankMatches<String>(
+      query: cleanQuery,
+      candidates: candidateWords.keys.toList(),
+      wordExtractor: (s) => s,
+      minSimilarity: 0.25,
+      maxResults: 8,
+    );
 
     final results = <LexicalEntry>[];
-    for (final row in wordRows) {
-      final entry = await getOfflineWord(row.word);
-      if (entry != null) results.add(entry);
+    for (final match in matches) {
+      final headword = candidateWords[match.item];
+      if (headword != null) {
+        final entry = await getOfflineWord(headword);
+        if (entry != null) results.add(entry);
+      }
     }
     return results;
+  }
+
+  Future<List<String>> getOfflineSuggestions(String query, {int limit = 10}) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return [];
+
+    final Map<String, String> candidateMap = {};
+
+    // 1. Gather prefix candidates from CSV Words table (starts with cleanQuery)
+    final prefixWords = await (select(words)
+      ..where((t) => t.word.like('$cleanQuery%'))
+      ..limit(40)).get();
+
+    for (final w in prefixWords) {
+      candidateMap[w.word.toLowerCase()] = w.word;
+    }
+
+    // 2. Gather prefix candidates from SavedWords table
+    final prefixSaved = await (select(savedWords)
+      ..where((t) => t.word.like('$cleanQuery%'))
+      ..limit(20)).get();
+
+    for (final s in prefixSaved) {
+      candidateMap[s.word.toLowerCase()] = s.word;
+    }
+
+    // 3. Gather substring candidates from CSV Words table (%cleanQuery%)
+    if (candidateMap.length < 30) {
+      final subWords = await (select(words)
+        ..where((t) => t.word.like('%$cleanQuery%'))
+        ..limit(50)).get();
+
+      for (final w in subWords) {
+        if (!candidateMap.containsKey(w.word.toLowerCase())) {
+          candidateMap[w.word.toLowerCase()] = w.word;
+        }
+      }
+    }
+
+    // 4. Misspelling candidate retrieval for typos
+    if (candidateMap.length < 15 && cleanQuery.length >= 2) {
+      final firstLetter = cleanQuery[0];
+      final minLen = (cleanQuery.length - 2).clamp(1, 100);
+      final maxLen = cleanQuery.length + 3;
+
+      final typoWords = await (select(words)
+        ..where((t) => t.word.like('$firstLetter%') & t.word.length.isBetweenValues(minLen, maxLen))
+        ..limit(100)).get();
+
+      for (final w in typoWords) {
+        if (!candidateMap.containsKey(w.word.toLowerCase())) {
+          candidateMap[w.word.toLowerCase()] = w.word;
+        }
+      }
+    }
+
+    if (candidateMap.isEmpty) return [];
+
+    // 5. Perform Fuzzy Ranking across CSV dictionary and local words
+    final matches = FuzzySearch.rankMatches<String>(
+      query: cleanQuery,
+      candidates: candidateMap.keys.toList(),
+      wordExtractor: (s) => s,
+      minSimilarity: 0.15,
+      maxResults: limit,
+    );
+
+    final List<String> result = [];
+    for (final match in matches) {
+      final original = candidateMap[match.item];
+      if (original != null && !result.contains(original)) {
+        result.add(original);
+      }
+    }
+
+    for (final displayWord in candidateMap.values) {
+      if (!result.contains(displayWord)) {
+        result.add(displayWord);
+      }
+      if (result.length >= limit) break;
+    }
+
+    return result.take(limit).toList();
   }
 
   Future<int> getOfflineWordsCount() async {
@@ -414,10 +563,10 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> batchInsertOfflineWords(
     List<({String word, String? pos, String definition})> entries, {
-    void Function(double progress)? onProgress,
+    void Function(double progress, int count)? onProgress,
   }) async {
     int insertedCount = 0;
-    const chunkSize = 250;
+    const chunkSize = 500;
     final total = entries.length;
 
     for (int i = 0; i < total; i += chunkSize) {
@@ -428,27 +577,36 @@ class AppDatabase extends _$AppDatabase {
         for (final entry in chunk) {
           final wordClean = entry.word.toLowerCase();
 
-          final wordId = await into(words).insertOnConflictUpdate(
+          int wordId = await into(words).insert(
             WordsCompanion.insert(
               word: wordClean,
               partOfSpeech: Value(entry.pos),
               simpleMeaning: Value(entry.definition),
             ),
+            mode: InsertMode.insertOrIgnore,
           );
 
-          await into(definitions).insert(
-            DefinitionsCompanion.insert(
-              wordId: wordId,
-              definition: entry.definition,
-              senseNumber: const Value('1'),
-            ),
-          );
-          insertedCount++;
+          if (wordId == 0) {
+            final existing = await (select(words)..where((t) => t.word.equals(wordClean))).getSingleOrNull();
+            wordId = existing?.id ?? 0;
+          }
+
+          if (wordId > 0) {
+            await into(definitions).insert(
+              DefinitionsCompanion.insert(
+                wordId: wordId,
+                definition: entry.definition,
+                senseNumber: const Value('1'),
+              ),
+              mode: InsertMode.insertOrIgnore,
+            );
+            insertedCount++;
+          }
         }
       });
 
       if (onProgress != null) {
-        onProgress((end / total).clamp(0.0, 1.0));
+        onProgress((end / total).clamp(0.0, 1.0), insertedCount);
       }
     }
 
@@ -590,14 +748,35 @@ class AppDatabase extends _$AppDatabase {
         (word: 'aam', pos: 'n.', definition: 'A Dutch and German measure of liquids, varying in different cities.'),
         (word: 'aardvark', pos: 'n.', definition: 'An African burrowing nocturnal mammal (Orycteropus afer) that feeds on ants and termites.'),
         (word: 'abacus', pos: 'n.', definition: 'An instrument for performing arithmetical calculations by sliding counters along rods.'),
-        (word: 'abate', pos: 'v. t.', definition: 'To bring down or reduce from a higher to a lower state, degree, or intensity.'),
         (word: 'abandon', pos: 'v. t.', definition: 'To give up completely; to desert or forsake.'),
-        (word: 'reluctant', pos: 'a.', definition: 'Unwilling and hesitant; disinclined to action.'),
+        (word: 'abate', pos: 'v. t.', definition: 'To bring down or reduce from a higher to a lower state, degree, or intensity.'),
+        (word: 'ability', pos: 'n.', definition: 'The quality or state of being able; physical, mental, or legal power.'),
+        (word: 'able', pos: 'a.', definition: 'Having sufficient power, skill, or resources to accomplish something.'),
+        (word: 'absent', pos: 'a.', definition: 'Not present in a place, at an occasion, or as part of something.'),
+        (word: 'absorb', pos: 'v. t.', definition: 'To take in or soak up energy, liquid, or other substances.'),
+        (word: 'abstract', pos: 'a.', definition: 'Existing in thought or as an idea but not having a physical or concrete existence.'),
+        (word: 'academic', pos: 'a.', definition: 'Relating to education, research, or scholarship.'),
+        (word: 'accept', pos: 'v. t.', definition: 'To consent to receive or undertake something offered.'),
+        (word: 'accurate', pos: 'a.', definition: 'Correct in all details; exact and precise.'),
+        (word: 'achieve', pos: 'v. t.', definition: 'To successfully bring about or reach a desired objective by effort.'),
+        (word: 'acquire', pos: 'v. t.', definition: 'To buy or obtain an asset, object, or skill for oneself.'),
+        (word: 'adapt', pos: 'v.', definition: 'To make suitable to a new use or purpose; modify.'),
+        (word: 'adequate', pos: 'a.', definition: 'Satisfactory or acceptable in quality or quantity.'),
+        (word: 'aesthetic', pos: 'a.', definition: 'Concerned with beauty or the appreciation of beauty.'),
+        (word: 'alleviate', pos: 'v. t.', definition: 'To make suffering, deficiency, or a problem less severe.'),
+        (word: 'allocate', pos: 'v. t.', definition: 'To distribute resources or duties for a particular purpose.'),
+        (word: 'ambiguous', pos: 'a.', definition: 'Open to more than one interpretation; having a double meaning.'),
+        (word: 'analyze', pos: 'v. t.', definition: 'To examine methodically and in detail the constitution or structure.'),
+        (word: 'anticipate', pos: 'v. t.', definition: 'To regard as probable; expect or predict.'),
         (word: 'bohemian', pos: 'n.', definition: 'A person who lives an unconventional, artistic lifestyle.'),
         (word: 'ephemeral', pos: 'a.', definition: 'Lasting for a very short time; transitory; fleeting.'),
-        (word: 'serene', pos: 'a.', definition: 'Calm, peaceful, and untroubled; tranquil.'),
+        (word: 'horse', pos: 'n.', definition: 'A large plant-eating domesticated mammal with solid hooves and a flowing mane and tail.'),
+        (word: 'house', pos: 'n.', definition: 'A building for human habitation, especially one that is lived in by a family.'),
+        (word: 'human', pos: 'a.', definition: 'Relating to or characteristic of humankind; a person.'),
         (word: 'quintessential', pos: 'a.', definition: 'Representing the most perfect or typical example of a quality or class.'),
+        (word: 'reluctant', pos: 'a.', definition: 'Unwilling and hesitant; disinclined to action.'),
         (word: 'resilient', pos: 'a.', definition: 'Able to withstand or recover quickly from difficult conditions.'),
+        (word: 'serene', pos: 'a.', definition: 'Calm, peaceful, and untroubled; tranquil.'),
       ]);
     }
   }

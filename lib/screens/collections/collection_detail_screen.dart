@@ -6,6 +6,7 @@ import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
+import '../../data/services/export_service.dart';
 
 class CollectionDetailScreen extends ConsumerStatefulWidget {
   final int? collectionId;
@@ -305,6 +306,95 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
     );
   }
 
+  void _showExportCollectionBottomSheet(BuildContext context, List<SavedWord> words) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white30 : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Export Collection Vocabulary',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Choose a format to export ${words.length} vocabulary words:',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 20),
+
+              // Option 1: Anki CSV Deck Format
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.softPurple,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(CupertinoIcons.rectangle_stack_fill, color: Colors.purple, size: 20),
+                ),
+                title: const Text('Anki Flashcard Deck CSV', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Compatible with Anki Desktop & Mobile app (.csv)'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final csv = ExportService.exportToAnkiCsv(words);
+                  ExportService.copyToClipboard(context, csv, 'Anki CSV copied to clipboard!');
+                },
+              ),
+              const Divider(height: 1),
+
+              // Option 2: Formatted Study Sheet
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.softGreen,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(CupertinoIcons.doc_text_fill, color: Colors.green, size: 20),
+                ),
+                title: const Text('Formatted Study Sheet Text', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Clean printable text overview for study sheets'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
+                  ExportService.copyToClipboard(context, sheet, 'Study Sheet text copied to clipboard!');
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -346,6 +436,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
         ),
         title: Text(widget.title),
         actions: [
+          IconButton(
+            icon: const Icon(CupertinoIcons.share),
+            tooltip: 'Export Collection',
+            onPressed: () => _showExportCollectionBottomSheet(context, wordsAsync.value ?? []),
+          ),
           if (!isSmart && widget.collectionId != null) ...[
             IconButton(
               icon: const Icon(CupertinoIcons.plus_circle),

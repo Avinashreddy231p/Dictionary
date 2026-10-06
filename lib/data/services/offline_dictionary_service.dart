@@ -1,5 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:path/path.dart' as p;
 import '../../core/database/database.dart';
 
 class OfflineDictionaryService {
@@ -9,9 +12,56 @@ class OfflineDictionaryService {
 
   OfflineDictionaryService(this._db);
 
+  /// Automatically syncs the offline database from local CSV file or asset if count is low (< 1000).
+  Future<void> autoSyncIfNeeded({
+    void Function(double progress, int count)? onProgress,
+  }) async {
+    try {
+      final count = await _db.getOfflineWordsCount();
+      if (count < 1000) {
+        await syncFromLocalOrRemote(onProgress: onProgress);
+      }
+    } catch (_) {}
+  }
+
+  /// Attempts to load and index the dataset from local disk, Flutter assets, or HTTP download.
+  Future<int> syncFromLocalOrRemote({
+    void Function(double progress, int count)? onProgress,
+  }) async {
+    // 1. Check local disk paths (e.g. english Dictionary.csv)
+    final candidatePaths = [
+      'english Dictionary.csv',
+      'C:/Users/Avina/Music/Projects/Dictionary/english Dictionary.csv',
+      p.join(Directory.current.path, 'english Dictionary.csv'),
+    ];
+
+    for (final path in candidatePaths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          final content = await file.readAsString();
+          if (content.isNotEmpty) {
+            return await importCsvString(content, onProgress: onProgress);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Check Flutter Asset Bundle
+    try {
+      final assetContent = await rootBundle.loadString('english Dictionary.csv');
+      if (assetContent.isNotEmpty) {
+        return await importCsvString(assetContent, onProgress: onProgress);
+      }
+    } catch (_) {}
+
+    // 3. Fallback to HTTP download
+    return await downloadAndSyncDatabase(onProgress: onProgress);
+  }
+
   /// Downloads the full English Dictionary CSV dataset from GitHub and syncs it to the local SQLite database.
   Future<int> downloadAndSyncDatabase({
-    void Function(double progress)? onProgress,
+    void Function(double progress, int count)? onProgress,
   }) async {
     final response = await http.get(Uri.parse(datasetCsvUrl));
     if (response.statusCode == 200) {
@@ -24,7 +74,7 @@ class OfflineDictionaryService {
   /// Parses CSV dataset text and batch-inserts words and definitions into the database.
   Future<int> importCsvString(
     String csvData, {
-    void Function(double progress)? onProgress,
+    void Function(double progress, int count)? onProgress,
   }) async {
     final lines = const LineSplitter().convert(csvData);
     if (lines.isEmpty) return 0;
