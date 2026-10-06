@@ -17,10 +17,27 @@ final wordRepositoryProvider = Provider<WordRepository>((ref) {
   return WordRepository(db);
 });
 
+// Trigger to open keyboard on Search screen when Search bottom nav icon is tapped/double-tapped
+class SearchFocusNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void trigger() {
+    state++;
+  }
+}
+
+final searchFocusTriggerProvider = NotifierProvider<SearchFocusNotifier, int>(SearchFocusNotifier.new);
+
 // Saved Words Providers
 final savedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllSavedWords();
+});
+
+final todaySavedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchTodaySavedWords();
 });
 
 final recentSavedWordsProvider = StreamProvider<List<SavedWord>>((ref) {
@@ -41,6 +58,16 @@ final needsReviewStreamProvider = StreamProvider<List<SavedWord>>((ref) {
 final wordsWithSourceStreamProvider = StreamProvider<List<SavedWord>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchWordsWithSource();
+});
+
+final masteredWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchMasteredWords();
+});
+
+final wordsWithNotesStreamProvider = StreamProvider<List<SavedWord>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchWordsWithNotes();
 });
 
 final isWordSavedStreamProvider = StreamProvider.family<bool, String>((ref, word) {

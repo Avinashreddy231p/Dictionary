@@ -12,7 +12,7 @@ class WordRepository {
   Future<List<LexicalEntry>> searchWord(String query) async {
     try {
       final apiResults = await _service.fetchWord(query);
-      if (apiResults.isNotEmpty) return apiResults;
+      if (apiResults.entries.isNotEmpty) return apiResults.entries;
     } catch (_) {}
 
     // Fallback to local database if API fails or returns no results

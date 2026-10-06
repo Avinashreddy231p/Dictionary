@@ -181,23 +181,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context),
-              const SizedBox(height: 32),
-              _buildHeroSection(context),
               const SizedBox(height: 24),
-              _buildSearchBar(context),
-              const SizedBox(height: 32),
-              _buildRecentSearches(context),
-              const SizedBox(height: 32),
-              _buildContinueReading(context),
-              const SizedBox(height: 32),
-              _buildQuickActions(context),
-              const SizedBox(height: 32),
+              _buildHeroSection(context),
+              const SizedBox(height: 20),
+              _buildSearchSection(context),
+              const SizedBox(height: 28),
               _buildTodayVocabulary(context),
+              const SizedBox(height: 28),
+              _buildContinueReading(context),
+              const SizedBox(height: 28),
+              _buildQuickActions(context),
               const SizedBox(height: 32),
             ],
           ),
@@ -208,33 +206,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            Icon(CupertinoIcons.sparkles,
-                color: isDark ? Colors.white : AppColors.textPrimary, size: 28),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                CupertinoIcons.sparkles,
+                color: theme.primaryColor,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'LexiLens',
                   style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                      ),
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 Text(
                   'Understand every word.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.primaryColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: theme.primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -258,89 +266,137 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          flex: 3,
-          child: Text(
-            'Better\nWords,\nBigger\nStories.',
-            style: theme.textTheme.displayMedium?.copyWith(
-                  height: 1.1,
-                ),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Container(
-            height: 120,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.adaptiveSoftYellow(context),
-              border: isDark
-                  ? Border.all(color: AppColors.darkHeaderYellowText, width: 1.5)
-                  : null,
-            ),
-            child: Center(
-              child: Icon(
-                CupertinoIcons.book_fill,
-                size: 48,
-                color: isDark ? AppColors.darkHeaderYellowText : theme.primaryColor,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: isDark
+            ? AppColors.homeHeroGradientDark
+            : const LinearGradient(
+                colors: [Color(0xFFFFF7E6), Color(0xFFFFECC8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ),
-          ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFF0E2C8),
+          width: 1.5,
         ),
-      ],
-    );
-  }
-
-  Widget _buildSearchBar(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () {
-        context.go('/home/search');
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.cardTheme.color,
-          borderRadius: BorderRadius.circular(50),
-          border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Icon(CupertinoIcons.search,
-                color: isDark ? Colors.white70 : AppColors.textSecondary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Search a word or phrase...',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+      ),
+      child: Stack(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkHeaderYellowText.withOpacity(0.15)
+                            : AppColors.textPrimary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.star_fill,
+                            size: 12,
+                            color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'DAILY DISCOVERY',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.0,
+                              color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Better Words,\nBigger Stories.',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        height: 1.15,
+                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Explore nuanced definitions, context & smart vocabulary collections.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                        fontSize: 12,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.primaryColor,
-                shape: BoxShape.circle,
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: Container(
+                  height: 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isDark ? AppColors.darkSoftYellow : AppColors.headerYellow.withOpacity(0.4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isDark ? Colors.black : Colors.amber).withOpacity(0.12),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          CupertinoIcons.book_fill,
+                          size: 52,
+                          color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
+                        ),
+                        Positioned(
+                          right: 12,
+                          top: 14,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: theme.primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              CupertinoIcons.sparkles,
+                              size: 10,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              child: const Icon(
-                CupertinoIcons.arrow_right,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildRecentSearches(BuildContext context) {
+  Widget _buildSearchSection(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final recentSearchesAsync = ref.watch(recentSearchesStreamProvider);
@@ -348,67 +404,378 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        GestureDetector(
+          onTap: () {
+            context.go('/home/search');
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.cardTheme.color,
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  CupertinoIcons.search,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Search a word, phrase, or sentence...',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white60 : AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.arrow_right,
+                    color: Colors.white,
+                    size: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        recentSearchesAsync.when(
+          data: (queries) {
+            final list = queries.isNotEmpty
+                ? queries
+                : ['reluctant', 'peculiar', 'ambiguous', 'serene'];
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8, left: 4),
+                    child: Text(
+                      'Recent:',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        color: isDark ? Colors.white38 : AppColors.textDisabled,
+                      ),
+                    ),
+                  ),
+                  ...list.map((word) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: InkWell(
+                        onTap: () async {
+                          final repo = ref.read(wordRepositoryProvider);
+                          final results = await repo.searchWord(word);
+                          if (results.isNotEmpty && context.mounted) {
+                            context.push('/home/search/detail', extra: results.first);
+                          } else if (context.mounted) {
+                            context.go('/home/search');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.darkSurface.withOpacity(0.8)
+                                : AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: AppColors.cardBorder(context),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                CupertinoIcons.clock,
+                                size: 11,
+                                color: isDark ? Colors.white54 : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                word,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white90 : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTodayVocabulary(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final savedWordsAsync = ref.watch(savedWordsStreamProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Recent Searches',
-              style: theme.textTheme.titleMedium,
+            Row(
+              children: [
+                Icon(
+                  CupertinoIcons.sparkles,
+                  color: theme.primaryColor,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Today\'s Vocabulary',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
             TextButton(
-              onPressed: () => context.go('/home/search'),
+              onPressed: () => context.go('/collections'),
               child: Text(
                 'See all',
                 style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.primaryColor,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  color: theme.primaryColor,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        recentSearchesAsync.when(
-          data: (queries) {
-            final list = queries.isNotEmpty ? queries : ['reluctant', 'peculiar', 'ambiguous', 'serene'];
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: list.map((word) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: InkWell(
-                      onTap: () async {
-                        final repo = ref.read(wordRepositoryProvider);
-                        final results = await repo.searchWord(word);
-                        if (results.isNotEmpty && context.mounted) {
-                          context.push('/home/search/detail', extra: results.first);
-                        } else if (context.mounted) {
-                          context.go('/home/search');
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: Chip(
-                        label: Text(word),
-                        backgroundColor: theme.cardTheme.color,
-                        side: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        labelStyle: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : AppColors.textPrimary,
-                            ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
+        savedWordsAsync.when(
+          data: (words) {
+            final todayWord = words.isNotEmpty ? words.first : null;
+            final wordTitle = todayWord?.word ?? 'serene';
+            final phonetic = todayWord?.phonetic ?? '/səˈriːn/';
+            final pos = todayWord?.partOfSpeech ?? 'adjective';
+            final cefr = todayWord?.cefr ?? 'B1';
+            final meaning = todayWord?.meaning ??
+                'Calm, peaceful, and untroubled; tranquil.';
+            final example = todayWord?.example ??
+                'The serene landscape brought a deep sense of peace.';
+
+            return InkWell(
+              onTap: () async {
+                final repo = ref.read(wordRepositoryProvider);
+                final results = await repo.searchWord(wordTitle);
+                if (results.isNotEmpty && context.mounted) {
+                  context.push('/home/search/detail', extra: results.first);
+                } else if (todayWord != null && context.mounted) {
+                  final fallbackEntry = LexicalEntry(
+                    core: CoreData(
+                      headword: todayWord.word,
+                      homograph: 0,
+                      partOfSpeech: todayWord.partOfSpeech ?? 'word',
+                      phonetic: todayWord.phonetic ?? '',
+                      audioUrl: '',
+                      syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
+                    ),
+                    senses: [
+                      Sense(
+                        senseNumber: '1',
+                        definition: todayWord.meaning ?? 'Vocabulary word',
+                        examples: todayWord.example != null ? [todayWord.example!] : [],
+                        labels: [],
+                      )
+                    ],
+                    grammar: GrammarData(
+                      verbDivision: '',
+                      usageNotes: [],
+                      inflections: [],
+                      relatedForms: [],
+                    ),
+                    linguistic: LinguisticData(
+                      etymology: '',
+                      firstKnownUse: '',
+                    ),
+                    lexiLens: LexiLensLayer(
+                      simpleMeaning: todayWord.meaning ?? 'Vocabulary word',
+                      contextualMeaning: todayWord.contextSentence ?? '',
+                      synonyms: [],
+                      antonyms: [],
                     ),
                   );
-                }).toList(),
+                  context.push('/home/search/detail', extra: fallbackEntry);
+                }
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: theme.primaryColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                pos.toUpperCase(),
+                                style: TextStyle(
+                                  color: theme.primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                cefr,
+                                style: TextStyle(
+                                  color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 18,
+                          color: isDark ? Colors.white38 : AppColors.textDisabled,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          wordTitle,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 22,
+                          ),
+                        ),
+                        if (phonetic.isNotEmpty) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            phonetic,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: isDark ? Colors.white54 : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      meaning,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.35,
+                        color: isDark ? Colors.white87 : AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (example.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.darkBackground.withOpacity(0.6)
+                              : AppColors.background.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark ? Colors.white12 : AppColors.border.withOpacity(0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.quote_bubble,
+                              size: 14,
+                              color: theme.primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '"$example"',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontStyle: FontStyle.italic,
+                                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             );
           },
-          loading: () => const SizedBox(height: 40, child: CircularProgressIndicator()),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (_, __) => const SizedBox.shrink(),
         ),
       ],
@@ -426,89 +793,177 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final title = activeCol?.title ?? 'The Great Gatsby';
         final desc = activeCol?.description ?? 'Chapter 3 • Vocabulary reading';
 
-        return InkWell(
-          onTap: () {
-            if (activeCol != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CollectionDetailScreen(
-                    collectionId: activeCol.id,
-                    title: activeCol.title,
-                    description: activeCol.description,
-                  ),
-                ),
-              );
-            } else {
-              context.go('/collections');
-            }
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: isDark
-                  ? AppColors.continueReadingGradientDark
-                  : AppColors.continueReadingGradient,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark ? const Color(0xFF4A3485) : Colors.transparent,
-                width: 1.5,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Continue Reading',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(CupertinoIcons.book, color: Colors.white, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Continue Reading',
-                            style: theme.textTheme.labelLarge?.copyWith(
-                                  color: Colors.white,
-                                ),
-                          ),
-                        ],
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () {
+                if (activeCol != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CollectionDetailScreen(
+                        collectionId: activeCol.id,
+                        title: activeCol.title,
+                        description: activeCol.description,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(
+                    ),
+                  );
+                } else {
+                  context.go('/collections');
+                }
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: isDark
+                      ? AppColors.continueReadingGradientDark
+                      : AppColors.continueReadingGradient,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isDark ? const Color(0xFF38236B) : const Color(0xFF8C71FF))
+                          .withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                CupertinoIcons.book,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'CURRENTLY READING',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            '68% Done',
+                            style: TextStyle(
                               color: Colors.white,
+                              fontSize: 11,
                               fontWeight: FontWeight.w800,
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        desc,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      desc,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white80,
+                        fontSize: 13,
                       ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: const LinearProgressIndicator(
+                        value: 0.68,
+                        backgroundColor: Colors.white24,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Chapter 3 • 8 Saved Words',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: const [
+                              Text(
+                                'Resume',
+                                style: TextStyle(
+                                  color: Color(0xFF6344FF),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(
+                                CupertinoIcons.play_fill,
+                                color: Color(0xFF6344FF),
+                                size: 12,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white24,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(CupertinoIcons.play_fill, color: Colors.white, size: 18),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 
@@ -521,7 +976,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         Text(
           'Quick Actions',
-          style: theme.textTheme.titleMedium,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 16),
         Row(
@@ -599,7 +1056,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
             ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: Alignment.center,
               children: [
                 Icon(icon, color: textColor),
                 const SizedBox(height: 8),
@@ -617,139 +1074,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTodayVocabulary(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final savedWordsAsync = ref.watch(savedWordsStreamProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Today\'s Vocabulary',
-              style: theme.textTheme.titleMedium,
-            ),
-            TextButton(
-              onPressed: () => context.go('/collections'),
-              child: Text(
-                'See all',
-                style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.primaryColor,
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        savedWordsAsync.when(
-          data: (words) {
-            final todayWord = words.isNotEmpty ? words.first : null;
-            final wordTitle = todayWord?.word ?? 'serene';
-            final posAndCefr = '${todayWord?.partOfSpeech ?? 'adjective'} • ${todayWord?.cefr ?? 'B1'}';
-
-            return InkWell(
-              onTap: () async {
-                final repo = ref.read(wordRepositoryProvider);
-                final results = await repo.searchWord(wordTitle);
-                if (results.isNotEmpty && context.mounted) {
-                  context.push('/home/search/detail', extra: results.first);
-                } else if (todayWord != null && context.mounted) {
-                  final fallbackEntry = LexicalEntry(
-                    core: CoreData(
-                      headword: todayWord.word,
-                      homograph: 0,
-                      partOfSpeech: todayWord.partOfSpeech ?? 'word',
-                      phonetic: todayWord.phonetic ?? '',
-                      audioUrl: '',
-                      syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
-                    ),
-                    senses: [
-                      Sense(
-                        senseNumber: '1',
-                        definition: todayWord.meaning ?? 'Vocabulary word',
-                        examples: todayWord.example != null ? [todayWord.example!] : [],
-                        labels: [],
-                      )
-                    ],
-                    grammar: GrammarData(
-                      verbDivision: '',
-                      usageNotes: [],
-                      inflections: [],
-                      relatedForms: [],
-                    ),
-                    linguistic: LinguisticData(
-                      etymology: '',
-                      firstKnownUse: '',
-                    ),
-                    lexiLens: LexiLensLayer(
-                      simpleMeaning: todayWord.meaning ?? 'Vocabulary word',
-                      contextualMeaning: todayWord.contextSentence ?? '',
-                      synonyms: [],
-                      antonyms: [],
-                    ),
-                  );
-                  context.push('/home/search/detail', extra: fallbackEntry);
-                }
-              },
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(
-                        CupertinoIcons.photo,
-                        color: isDark ? AppColors.darkSoftBlueText : theme.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            wordTitle,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            posAndCefr,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(CupertinoIcons.chevron_right,
-                        color: isDark ? Colors.white70 : AppColors.textPrimary, size: 20),
-                  ],
-                ),
-              ),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, __) => const SizedBox.shrink(),
-        ),
-      ],
     );
   }
 }

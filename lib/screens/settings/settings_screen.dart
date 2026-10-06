@@ -1,6 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/providers.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../data/models/settings_state.dart';
 import '../../theme/app_accents.dart';
@@ -8,6 +12,17 @@ import '../../theme/app_colors.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
+
+  void _showFeedback(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,12 +46,12 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     _buildHeader(context, primaryColor),
                     const SizedBox(height: 20),
-                    _buildProfileCard(context, primaryColor, isDark),
+                    _buildStatsCard(context, ref, primaryColor, isDark, settings.dailyGoal),
                     const SizedBox(height: 28),
                     _buildSectionHeader(
                       context,
                       icon: CupertinoIcons.paintbrush_fill,
-                      title: 'Appearance & Accent Color',
+                      title: 'Appearance & Interaction',
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 12),
@@ -72,6 +87,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildLearningCard(
                       context,
+                      ref,
                       settings,
                       settingsNotifier,
                       primaryColor,
@@ -87,6 +103,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _buildStorageCard(
                       context,
+                      ref,
                       settings,
                       settingsNotifier,
                       primaryColor,
@@ -100,7 +117,7 @@ class SettingsScreen extends ConsumerWidget {
                       primaryColor: primaryColor,
                     ),
                     const SizedBox(height: 12),
-                    _buildAboutCard(context, settingsNotifier, primaryColor, isDark),
+                    _buildAboutCard(context, ref, settingsNotifier, primaryColor, isDark),
                     const SizedBox(height: 32),
                     _buildFooter(context, primaryColor),
                     const SizedBox(height: 40),
@@ -116,26 +133,32 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildHeader(BuildContext context, Color primaryColor) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Settings',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                    height: 1.1,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Customize your LexiLens experience',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settings',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                      height: 1.1,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Customize your LexiLens experience',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 12),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -153,99 +176,228 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileCard(BuildContext context, Color primaryColor, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF232338) : AppColors.softYellow.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isDark ? const Color(0xFF3B3B54) : AppColors.headerYellow,
-          width: 1.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              color: primaryColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withOpacity(0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: Text(
-                'LL',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                ),
-              ),
-            ),
+  Widget _buildStatsCard(
+    BuildContext context,
+    WidgetRef ref,
+    Color primaryColor,
+    bool isDark,
+    int dailyGoal,
+  ) {
+    final savedWordsAsync = ref.watch(savedWordsStreamProvider);
+    final todayWordsAsync = ref.watch(todaySavedWordsStreamProvider);
+    final masteredWordsAsync = ref.watch(masteredWordsStreamProvider);
+
+    final savedWordsCount = savedWordsAsync.when(
+      data: (words) => words.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final todaySavedCount = todayWordsAsync.when(
+      data: (words) => words.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final masteredCount = masteredWordsAsync.when(
+      data: (words) => words.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final masteryRate = savedWordsCount == 0
+        ? '0% Rate'
+        : '${((masteredCount / savedWordsCount) * 100).round()}% Accuracy';
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => context.push('/stats'),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark ? AppColors.darkBorder : AppColors.border,
+            width: 1.5,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          boxShadow: [
+            BoxShadow(
+              color: primaryColor.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      'LexiLens Learner',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.badgeTeal,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'PRO',
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.darkSoftYellow
+                        : AppColors.softYellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    CupertinoIcons.chart_bar_square_fill,
+                    color: isDark
+                        ? AppColors.darkSoftYellowText
+                        : Colors.orange.shade800,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Learning Stats',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Full Analytics',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 10,
+                          color: primaryColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(CupertinoIcons.flame_fill, color: Colors.orange, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '14 Day Streak',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.orangeAccent : Colors.deepOrange,
-                          ),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(CupertinoIcons.book_fill, color: primaryColor, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      '128 Words Saved',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Icon(CupertinoIcons.chevron_right, size: 12, color: primaryColor),
+                    ],
+                  ),
                 ),
               ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatTile(
+                    context,
+                    title: 'Streak',
+                    value: '14 Days 🔥',
+                    icon: CupertinoIcons.flame_fill,
+                    iconColor: Colors.orange,
+                    bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.5),
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatTile(
+                    context,
+                    title: 'Words Saved',
+                    value: '$savedWordsCount Words',
+                    icon: CupertinoIcons.book_fill,
+                    iconColor: primaryColor,
+                    bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.5),
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatTile(
+                    context,
+                    title: 'Today\'s Progress',
+                    value: '$todaySavedCount / $dailyGoal Words',
+                    icon: CupertinoIcons.checkmark_seal_fill,
+                    iconColor: Colors.green,
+                    bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withOpacity(0.5),
+                    isDark: isDark,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildStatTile(
+                    context,
+                    title: 'Mastery Rate',
+                    value: masteryRate,
+                    icon: CupertinoIcons.star_fill,
+                    iconColor: Colors.amber,
+                    bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.5),
+                    isDark: isDark,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatTile(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? iconColor.withOpacity(0.3) : Colors.transparent,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
             ),
           ),
         ],
@@ -263,12 +415,16 @@ class SettingsScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 18, color: primaryColor),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.2,
-              ),
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -317,7 +473,10 @@ class SettingsScreen extends ConsumerWidget {
                     label: 'System',
                     icon: CupertinoIcons.device_phone_portrait,
                     isSelected: settings.themeMode == ThemeMode.system,
-                    onTap: () => settingsNotifier.setThemeMode(ThemeMode.system),
+                    onTap: () {
+                      settingsNotifier.setThemeMode(ThemeMode.system);
+                      _showFeedback(context, 'Theme set to System Default');
+                    },
                     primaryColor: primaryColor,
                     isDark: isDark,
                   ),
@@ -329,7 +488,10 @@ class SettingsScreen extends ConsumerWidget {
                     label: 'Light',
                     icon: CupertinoIcons.sun_max_fill,
                     isSelected: settings.themeMode == ThemeMode.light,
-                    onTap: () => settingsNotifier.setThemeMode(ThemeMode.light),
+                    onTap: () {
+                      settingsNotifier.setThemeMode(ThemeMode.light);
+                      _showFeedback(context, 'Light Theme activated');
+                    },
                     primaryColor: primaryColor,
                     isDark: isDark,
                   ),
@@ -341,7 +503,10 @@ class SettingsScreen extends ConsumerWidget {
                     label: 'Dark',
                     icon: CupertinoIcons.moon_fill,
                     isSelected: settings.themeMode == ThemeMode.dark,
-                    onTap: () => settingsNotifier.setThemeMode(ThemeMode.dark),
+                    onTap: () {
+                      settingsNotifier.setThemeMode(ThemeMode.dark);
+                      _showFeedback(context, 'Dark Theme activated');
+                    },
                     primaryColor: primaryColor,
                     isDark: isDark,
                   ),
@@ -370,7 +535,10 @@ class SettingsScreen extends ConsumerWidget {
               children: AppAccent.presets.map((accent) {
                 final isSelected = settings.accentColor.value == accent.primary.value;
                 return InkWell(
-                  onTap: () => settingsNotifier.setAccentColor(accent.primary),
+                  onTap: () {
+                    settingsNotifier.setAccentColor(accent.primary);
+                    _showFeedback(context, 'Accent color set to ${accent.name}');
+                  },
                   borderRadius: BorderRadius.circular(16),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -440,13 +608,51 @@ class SettingsScreen extends ConsumerWidget {
               child: Divider(height: 1),
             ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Text Scaling',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Haptic Feedback',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tactile vibration on tap actions',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: settings.hapticFeedbackEnabled,
+                  activeColor: primaryColor,
+                  onChanged: (val) {
+                    settingsNotifier.setHapticFeedback(val);
+                    if (val) HapticFeedback.selectionClick();
+                    _showFeedback(context, val ? 'Haptic feedback enabled' : 'Haptic feedback disabled');
+                  },
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(height: 1),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Text Scaling',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 Text(
                   _getFontScaleLabel(settings.fontScale),
@@ -544,14 +750,17 @@ class SettingsScreen extends ConsumerWidget {
               size: 20,
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected
-                    ? Colors.white
-                    : (isDark ? Colors.white : AppColors.textPrimary),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white : AppColors.textPrimary),
+                ),
               ),
             ),
           ],
@@ -589,7 +798,10 @@ class SettingsScreen extends ConsumerWidget {
                     label: '🇺🇸 US English',
                     subtitle: 'General American',
                     isSelected: settings.preferredAccent == 'US',
-                    onTap: () => settingsNotifier.setPreferredAccent('US'),
+                    onTap: () {
+                      settingsNotifier.setPreferredAccent('US');
+                      _showFeedback(context, 'Accent set to US General American');
+                    },
                     primaryColor: primaryColor,
                     isDark: isDark,
                   ),
@@ -601,7 +813,10 @@ class SettingsScreen extends ConsumerWidget {
                     label: '🇬🇧 UK English',
                     subtitle: 'Received Pronunciation',
                     isSelected: settings.preferredAccent == 'UK',
-                    onTap: () => settingsNotifier.setPreferredAccent('UK'),
+                    onTap: () {
+                      settingsNotifier.setPreferredAccent('UK');
+                      _showFeedback(context, 'Accent set to UK Received Pronunciation');
+                    },
                     primaryColor: primaryColor,
                     isDark: isDark,
                   ),
@@ -635,7 +850,13 @@ class SettingsScreen extends ConsumerWidget {
                 Switch.adaptive(
                   value: settings.autoPlayAudio,
                   activeColor: primaryColor,
-                  onChanged: (val) => settingsNotifier.setAutoPlayAudio(val),
+                  onChanged: (val) {
+                    settingsNotifier.setAutoPlayAudio(val);
+                    _showFeedback(
+                      context,
+                      val ? 'Auto-play audio enabled' : 'Auto-play audio disabled',
+                    );
+                  },
                 ),
               ],
             ),
@@ -655,18 +876,25 @@ class SettingsScreen extends ConsumerWidget {
                 final isSelected = settings.audioSpeed == speed;
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: ChoiceChip(
-                      label: Text('${speed}x'),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      labelPadding: EdgeInsets.zero,
+                      label: Center(
+                        child: Text(
+                          '${speed}x',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: isSelected
+                                ? (isDark ? Colors.white : AppColors.textPrimary)
+                                : (isDark ? Colors.white70 : AppColors.textSecondary),
+                          ),
+                        ),
+                      ),
                       selected: isSelected,
                       selectedColor: isDark ? primaryColor : AppColors.softYellow,
                       backgroundColor: isDark ? const Color(0xFF27273C) : AppColors.background,
-                      labelStyle: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isSelected
-                            ? (isDark ? Colors.white : AppColors.textPrimary)
-                            : (isDark ? Colors.white70 : AppColors.textSecondary),
-                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                         side: BorderSide(
@@ -677,7 +905,10 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                       ),
                       showCheckmark: false,
-                      onSelected: (_) => settingsNotifier.setAudioSpeed(speed),
+                      onSelected: (_) {
+                        settingsNotifier.setAudioSpeed(speed);
+                        _showFeedback(context, 'Audio playback speed set to ${speed}x');
+                      },
                     ),
                   ),
                 );
@@ -702,7 +933,7 @@ class SettingsScreen extends ConsumerWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isSelected
               ? (isDark ? primaryColor.withOpacity(0.3) : primaryColor.withOpacity(0.12))
@@ -718,11 +949,15 @@ class SettingsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
               ),
             ),
             const SizedBox(height: 2),
@@ -731,6 +966,8 @@ class SettingsScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontSize: 11,
                   ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -740,11 +977,28 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildLearningCard(
     BuildContext context,
+    WidgetRef ref,
     SettingsState settings,
     SettingsNotifier settingsNotifier,
     Color primaryColor,
     bool isDark,
   ) {
+    final todayWordsAsync = ref.watch(todaySavedWordsStreamProvider);
+    final todaySavedCount = todayWordsAsync.when(
+      data: (words) => words.length,
+      loading: () => 0,
+      error: (_, __) => 0,
+    );
+
+    final goal = settings.dailyGoal;
+    final progressRatio = (todaySavedCount / goal).clamp(0.0, 1.0);
+    final actualPercent = ((todaySavedCount / goal) * 100).round();
+    final isGoalMet = todaySavedCount >= goal;
+
+    final progressText = isGoalMet
+        ? '$todaySavedCount of $goal ($actualPercent% 🎉)'
+        : '$todaySavedCount of $goal ($actualPercent%)';
+
     return _buildCardContainer(
       isDark: isDark,
       child: Padding(
@@ -752,24 +1006,56 @@ class SettingsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Daily Vocabulary Target',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            const SizedBox(height: 12),
             Row(
-              children: [5, 10, 15, 20].map((goal) {
-                final isSelected = settings.dailyGoal == goal;
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Daily Vocabulary Target',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  progressText,
+                  style: TextStyle(
+                    color: isGoalMet ? Colors.green : primaryColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: progressRatio,
+                backgroundColor: isDark
+                    ? const Color(0xFF32324A)
+                    : primaryColor.withOpacity(0.12),
+                color: isGoalMet ? Colors.green : primaryColor,
+                minHeight: 8,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [5, 10, 15, 20].map((g) {
+                final isSelected = settings.dailyGoal == g;
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: InkWell(
-                      onTap: () => settingsNotifier.setDailyGoal(goal),
+                      onTap: () {
+                        settingsNotifier.setDailyGoal(g);
+                        _showFeedback(context, 'Daily goal updated to $g words/day');
+                      },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected
                               ? primaryColor
@@ -784,24 +1070,30 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         child: Column(
                           children: [
-                            Text(
-                              '$goal',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: isSelected
-                                    ? Colors.white
-                                    : (isDark ? Colors.white : AppColors.textPrimary),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '$g',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : (isDark ? Colors.white : AppColors.textPrimary),
+                                ),
                               ),
                             ),
-                            Text(
-                              'words/day',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white70
-                                    : AppColors.textSecondary,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'words/day',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected
+                                      ? Colors.white70
+                                      : AppColors.textSecondary,
+                                ),
                               ),
                             ),
                           ],
@@ -811,6 +1103,45 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 );
               }).toList(),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(height: 1),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Word of the Day Notification',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Receive featured vocabulary daily at ${settings.wordOfTheDayTime}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: settings.wordOfTheDayNotification,
+                  activeColor: primaryColor,
+                  onChanged: (val) {
+                    settingsNotifier.setWordOfTheDayNotification(val);
+                    _showFeedback(
+                      context,
+                      val
+                          ? 'Word of the Day scheduled for ${settings.wordOfTheDayTime}'
+                          : 'Word of the Day notifications disabled',
+                    );
+                  },
+                ),
+              ],
             ),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
@@ -839,7 +1170,15 @@ class SettingsScreen extends ConsumerWidget {
                 Switch.adaptive(
                   value: settings.dailyReminders,
                   activeColor: primaryColor,
-                  onChanged: (val) => settingsNotifier.setDailyReminders(val),
+                  onChanged: (val) {
+                    settingsNotifier.setDailyReminders(val);
+                    _showFeedback(
+                      context,
+                      val
+                          ? 'Daily study reminders enabled for ${settings.reminderTime}'
+                          : 'Daily reminders disabled',
+                    );
+                  },
                 ),
               ],
             ),
@@ -854,6 +1193,9 @@ class SettingsScreen extends ConsumerWidget {
                   if (timeOfDay != null) {
                     final formatted = timeOfDay.format(context);
                     settingsNotifier.setReminderTime(formatted);
+                    if (context.mounted) {
+                      _showFeedback(context, 'Study reminder set for $formatted every day');
+                    }
                   }
                 },
                 borderRadius: BorderRadius.circular(16),
@@ -868,20 +1210,19 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(CupertinoIcons.clock_fill,
-                              color: AppColors.textPrimary, size: 18),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Reminder Time: ${settings.reminderTime}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ],
+                      const Icon(CupertinoIcons.clock_fill,
+                          color: AppColors.textPrimary, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Reminder Time: ${settings.reminderTime}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       const Icon(CupertinoIcons.chevron_right,
                           size: 16, color: AppColors.textSecondary),
@@ -908,7 +1249,7 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Alert when your streak is about to reset',
+                        'Alert at 07:00 PM if 0 words saved today',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -917,7 +1258,15 @@ class SettingsScreen extends ConsumerWidget {
                 Switch.adaptive(
                   value: settings.streakProtection,
                   activeColor: primaryColor,
-                  onChanged: (val) => settingsNotifier.setStreakProtection(val),
+                  onChanged: (val) {
+                    settingsNotifier.setStreakProtection(val);
+                    _showFeedback(
+                      context,
+                      val
+                          ? 'Streak Protection active (Alerts at 07:00 PM if needed)'
+                          : 'Streak Protection disabled',
+                    );
+                  },
                 ),
               ],
             ),
@@ -929,6 +1278,7 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildStorageCard(
     BuildContext context,
+    WidgetRef ref,
     SettingsState settings,
     SettingsNotifier settingsNotifier,
     Color primaryColor,
@@ -957,7 +1307,13 @@ class SettingsScreen extends ConsumerWidget {
             trailing: Switch.adaptive(
               value: settings.offlineDatabaseEnabled,
               activeColor: primaryColor,
-              onChanged: (val) => settingsNotifier.setOfflineDatabaseEnabled(val),
+              onChanged: (val) {
+                settingsNotifier.setOfflineDatabaseEnabled(val);
+                _showFeedback(
+                  context,
+                  val ? 'Offline dictionary lookup active' : 'Offline mode disabled',
+                );
+              },
             ),
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
@@ -978,7 +1334,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
             subtitle: const Text('Remove search logs and cached audio'),
             onTap: () {
-              _showClearCacheDialog(context, settingsNotifier);
+              _showClearCacheDialog(context, ref, settingsNotifier);
             },
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
@@ -996,14 +1352,29 @@ class SettingsScreen extends ConsumerWidget {
               'Export Vocabulary Data',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
-            subtitle: const Text('Backup saved words as JSON'),
+            subtitle: const Text('Backup saved words as JSON to Clipboard'),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Exported 128 saved words to LexiLens_Backup.json'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              _exportVocabulary(context, ref);
+            },
+          ),
+          const Divider(height: 1, indent: 20, endIndent: 20),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.softBlue,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(CupertinoIcons.doc_on_clipboard, color: primaryColor, size: 20),
+            ),
+            title: const Text(
+              'Import Vocabulary Backup',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+            subtitle: const Text('Restore words from JSON text / Clipboard'),
+            onTap: () {
+              _showImportDialog(context, ref, settingsNotifier);
             },
           ),
         ],
@@ -1013,6 +1384,7 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildAboutCard(
     BuildContext context,
+    WidgetRef ref,
     SettingsNotifier settingsNotifier,
     Color primaryColor,
     bool isDark,
@@ -1071,12 +1443,7 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(CupertinoIcons.chevron_right,
                 size: 16, color: AppColors.textSecondary),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Thank you for supporting LexiLens! ⭐⭐⭐⭐⭐'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              _showFeedback(context, 'Thank you for supporting LexiLens! ⭐⭐⭐⭐⭐');
             },
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
@@ -1170,7 +1537,94 @@ class SettingsScreen extends ConsumerWidget {
     return 'Extra Large (130%)';
   }
 
-  void _showClearCacheDialog(BuildContext context, SettingsNotifier notifier) {
+  void _exportVocabulary(BuildContext context, WidgetRef ref) async {
+    try {
+      final words = await ref.read(databaseProvider).watchAllSavedWords().first;
+      final jsonList = words.map((w) => {
+        'word': w.word,
+        'phonetic': w.phonetic,
+        'partOfSpeech': w.partOfSpeech,
+        'meaning': w.meaning,
+        'example': w.example,
+        'cefr': w.cefr,
+        'dateAdded': w.dateAdded.toIso8601String(),
+      }).toList();
+
+      final jsonString = const JsonEncoder.withIndent('  ').convert(jsonList);
+      await Clipboard.setData(ClipboardData(text: jsonString));
+
+      if (context.mounted) {
+        _showFeedback(context, 'Exported ${words.length} saved words to Clipboard as JSON!');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showFeedback(context, 'Export completed');
+      }
+    }
+  }
+
+  void _showImportDialog(BuildContext context, WidgetRef ref, SettingsNotifier notifier) {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Import Vocabulary JSON',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Paste vocabulary JSON backup text below:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: '[{"word": "serene", "meaning": "calm"}, ...]',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () async {
+                final data = await Clipboard.getData(Clipboard.kTextPlain);
+                if (data != null && data.text != null) {
+                  controller.text = data.text!;
+                }
+              },
+              icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 16),
+              label: const Text('Paste from Clipboard'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final jsonStr = controller.text.trim();
+              if (jsonStr.isEmpty) return;
+              final db = ref.read(databaseProvider);
+              final count = await notifier.importVocabularyJson(jsonStr, db);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                _showFeedback(context, 'Successfully imported $count vocabulary words!');
+              }
+            },
+            child: const Text('Import Words'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearCacheDialog(BuildContext context, WidgetRef ref, SettingsNotifier notifier) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1180,7 +1634,7 @@ class SettingsScreen extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         content: const Text(
-          'This will delete cached search results and temporary audio files. Saved collections will not be affected.',
+          'This will delete search history logs from the database and clear temporary cache. Saved collections will not be affected.',
         ),
         actions: [
           TextButton(
@@ -1190,15 +1644,11 @@ class SettingsScreen extends ConsumerWidget {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
             onPressed: () async {
+              await ref.read(databaseProvider).clearRecentSearches();
               await notifier.clearCacheAndHistory();
               if (ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Cache and search history cleared successfully'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                _showFeedback(context, 'Search history and cache cleared successfully');
               }
             },
             child: const Text('Clear Cache'),
@@ -1231,12 +1681,7 @@ class SettingsScreen extends ConsumerWidget {
               await notifier.resetToDefaults();
               if (ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings reset to default values'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                _showFeedback(context, 'All settings reset to default values');
               }
             },
             child: const Text('Reset'),

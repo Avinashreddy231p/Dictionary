@@ -5,6 +5,7 @@ import '../screens/search/search_screen.dart';
 import '../screens/word_detail/word_detail_screen.dart';
 import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/stats/stats_screen.dart';
 import '../screens/main_scaffold.dart';
 import '../data/models/lexical_entry.dart';
 
@@ -21,6 +22,11 @@ final goRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/home',
   routes: [
+    GoRoute(
+      path: '/stats',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const StatsScreen(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return MainScaffold(navigationShell: navigationShell);

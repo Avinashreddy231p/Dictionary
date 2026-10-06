@@ -11,7 +11,7 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
   final int? collectionId;
   final String title;
   final String? description;
-  final String? smartType; // 'recent', 'review', 'favorites', 'book'
+  final String? smartType; // 'recent', 'review', 'favorites', 'book', 'mastered', 'notes'
 
   const CollectionDetailScreen({
     super.key,
@@ -35,92 +35,272 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
     super.dispose();
   }
 
-  void _showAddWordDialog(BuildContext context, int collectionId) {
+  void _showAddWordBottomSheet(BuildContext context, int collectionId) {
     final textController = TextEditingController();
-    showDialog(
+    bool isLoading = false;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Add Word to Collection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter a word to save and add to this collection:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'e.g. serendipity',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setBottomSheetState) {
+          final theme = Theme.of(context);
+          final isDark = theme.brightness == Brightness.dark;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white30 : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Header Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Add Word',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          CupertinoIcons.xmark_circle_fill,
+                          color: isDark ? Colors.white54 : AppColors.textDisabled,
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Save a word directly to "${widget.title}"',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Text Input Field
+                  TextField(
+                    controller: textController,
+                    autofocus: true,
+                    onChanged: (_) => setBottomSheetState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. serendipity, ephemeral...',
+                      prefixIcon: Icon(CupertinoIcons.search, color: isDark ? Colors.white60 : AppColors.textSecondary),
+                      filled: true,
+                      fillColor: theme.cardTheme.color,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(50),
+                        borderSide: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(50),
+                        borderSide: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(50),
+                        borderSide: BorderSide(color: theme.primaryColor, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Action Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
+                      ),
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final query = textController.text.trim();
+                              if (query.isNotEmpty) {
+                                setBottomSheetState(() {
+                                  isLoading = true;
+                                });
+
+                                final db = ref.read(databaseProvider);
+                                final repo = ref.read(wordRepositoryProvider);
+
+                                // Fetch dictionary entry if available
+                                final results = await repo.searchWord(query);
+                                final entry = results.isNotEmpty ? results.first : null;
+
+                                final savedId = await db.saveWord(
+                                  word: query,
+                                  phonetic: entry?.core.phonetic,
+                                  partOfSpeech: entry?.core.partOfSpeech,
+                                  meaning: entry?.lexiLens.simpleMeaning ?? 'Saved custom word',
+                                  example: entry?.senses.isNotEmpty == true && entry!.senses.first.examples.isNotEmpty
+                                      ? entry.senses.first.examples.first
+                                      : null,
+                                  source: widget.title,
+                                );
+                                await db.addWordToCollection(collectionId, savedId);
+
+                                if (context.mounted) {
+                                  Navigator.pop(ctx);
+                                }
+                              }
+                            },
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Text(
+                              'Add to Collection',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.textPrimary,
-              foregroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-            onPressed: () async {
-              final query = textController.text.trim();
-              if (query.isNotEmpty) {
-                Navigator.pop(ctx);
-                final db = ref.read(databaseProvider);
-                final repo = ref.read(wordRepositoryProvider);
-                
-                // Fetch dictionary entry if available
-                final results = await repo.searchWord(query);
-                final entry = results.isNotEmpty ? results.first : null;
-                
-                final savedId = await db.saveWord(
-                  word: query,
-                  phonetic: entry?.core.phonetic,
-                  partOfSpeech: entry?.core.partOfSpeech,
-                  meaning: entry?.lexiLens.simpleMeaning ?? 'Saved custom word',
-                  example: entry?.senses.isNotEmpty == true && entry!.senses.first.examples.isNotEmpty ? entry.senses.first.examples.first : null,
-                  source: widget.title,
-                );
-                await db.addWordToCollection(collectionId, savedId);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
-  void _confirmDeleteCollection(BuildContext context, int collectionId) {
-    showDialog(
+  void _confirmDeleteCollectionBottomSheet(BuildContext context, int collectionId) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Delete Collection?'),
-        content: Text('Are you sure you want to delete "${widget.title}"? The words will remain in your general vocabulary.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(databaseProvider).deleteCollection(collectionId);
-              if (context.mounted && context.canPop()) {
-                context.pop();
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white30 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.trash, color: Colors.redAccent, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delete Collection?',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Are you sure you want to delete "${widget.title}"? Words will remain in your general vocabulary.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        side: BorderSide(color: AppColors.cardBorder(context)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ref.read(databaseProvider).deleteCollection(collectionId);
+                        if (context.mounted && context.canPop()) {
+                          context.pop();
+                        }
+                      },
+                      child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -141,6 +321,10 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
       wordsAsync = ref.watch(favoritesStreamProvider);
     } else if (widget.smartType == 'book') {
       wordsAsync = ref.watch(wordsWithSourceStreamProvider);
+    } else if (widget.smartType == 'mastered') {
+      wordsAsync = ref.watch(masteredWordsStreamProvider);
+    } else if (widget.smartType == 'notes') {
+      wordsAsync = ref.watch(wordsWithNotesStreamProvider);
     } else if (widget.collectionId != null) {
       wordsAsync = ref.watch(collectionWordsStreamProvider(widget.collectionId!));
     } else {
@@ -165,11 +349,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
           if (!isSmart && widget.collectionId != null) ...[
             IconButton(
               icon: const Icon(CupertinoIcons.plus_circle),
-              onPressed: () => _showAddWordDialog(context, widget.collectionId!),
+              onPressed: () => _showAddWordBottomSheet(context, widget.collectionId!),
             ),
             IconButton(
               icon: const Icon(CupertinoIcons.trash, color: Colors.redAccent),
-              onPressed: () => _confirmDeleteCollection(context, widget.collectionId!),
+              onPressed: () => _confirmDeleteCollectionBottomSheet(context, widget.collectionId!),
             ),
           ],
         ],
@@ -366,7 +550,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                                   foregroundColor: AppColors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                                 ),
-                                onPressed: () => _showAddWordDialog(context, widget.collectionId!),
+                                onPressed: () => _showAddWordBottomSheet(context, widget.collectionId!),
                                 icon: const Icon(CupertinoIcons.add),
                                 label: const Text('Add your first word'),
                               ),

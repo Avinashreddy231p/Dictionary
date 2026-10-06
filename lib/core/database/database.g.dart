@@ -29,22 +29,14 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
-  static const VerificationMeta _pronunciationMeta = const VerificationMeta(
-    'pronunciation',
+  static const VerificationMeta _phoneticMeta = const VerificationMeta(
+    'phonetic',
   );
   @override
-  late final GeneratedColumn<String> pronunciation = GeneratedColumn<String>(
-    'pronunciation',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _cefrMeta = const VerificationMeta('cefr');
-  @override
-  late final GeneratedColumn<String> cefr = GeneratedColumn<String>(
-    'cefr',
+  late final GeneratedColumn<String> phonetic = GeneratedColumn<String>(
+    'phonetic',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -61,13 +53,83 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _syllablesMeta = const VerificationMeta(
+    'syllables',
+  );
+  @override
+  late final GeneratedColumn<String> syllables = GeneratedColumn<String>(
+    'syllables',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cefrMeta = const VerificationMeta('cefr');
+  @override
+  late final GeneratedColumn<String> cefr = GeneratedColumn<String>(
+    'cefr',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _etymologyMeta = const VerificationMeta(
+    'etymology',
+  );
+  @override
+  late final GeneratedColumn<String> etymology = GeneratedColumn<String>(
+    'etymology',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _firstKnownUseMeta = const VerificationMeta(
+    'firstKnownUse',
+  );
+  @override
+  late final GeneratedColumn<String> firstKnownUse = GeneratedColumn<String>(
+    'first_known_use',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _simpleMeaningMeta = const VerificationMeta(
+    'simpleMeaning',
+  );
+  @override
+  late final GeneratedColumn<String> simpleMeaning = GeneratedColumn<String>(
+    'simple_meaning',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contextualMeaningMeta = const VerificationMeta(
+    'contextualMeaning',
+  );
+  @override
+  late final GeneratedColumn<String> contextualMeaning =
+      GeneratedColumn<String>(
+        'contextual_meaning',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     word,
-    pronunciation,
-    cefr,
+    phonetic,
     partOfSpeech,
+    syllables,
+    cefr,
+    etymology,
+    firstKnownUse,
+    simpleMeaning,
+    contextualMeaning,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -92,19 +154,10 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
     } else if (isInserting) {
       context.missing(_wordMeta);
     }
-    if (data.containsKey('pronunciation')) {
+    if (data.containsKey('phonetic')) {
       context.handle(
-        _pronunciationMeta,
-        pronunciation.isAcceptableOrUnknown(
-          data['pronunciation']!,
-          _pronunciationMeta,
-        ),
-      );
-    }
-    if (data.containsKey('cefr')) {
-      context.handle(
-        _cefrMeta,
-        cefr.isAcceptableOrUnknown(data['cefr']!, _cefrMeta),
+        _phoneticMeta,
+        phonetic.isAcceptableOrUnknown(data['phonetic']!, _phoneticMeta),
       );
     }
     if (data.containsKey('part_of_speech')) {
@@ -113,6 +166,51 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
         partOfSpeech.isAcceptableOrUnknown(
           data['part_of_speech']!,
           _partOfSpeechMeta,
+        ),
+      );
+    }
+    if (data.containsKey('syllables')) {
+      context.handle(
+        _syllablesMeta,
+        syllables.isAcceptableOrUnknown(data['syllables']!, _syllablesMeta),
+      );
+    }
+    if (data.containsKey('cefr')) {
+      context.handle(
+        _cefrMeta,
+        cefr.isAcceptableOrUnknown(data['cefr']!, _cefrMeta),
+      );
+    }
+    if (data.containsKey('etymology')) {
+      context.handle(
+        _etymologyMeta,
+        etymology.isAcceptableOrUnknown(data['etymology']!, _etymologyMeta),
+      );
+    }
+    if (data.containsKey('first_known_use')) {
+      context.handle(
+        _firstKnownUseMeta,
+        firstKnownUse.isAcceptableOrUnknown(
+          data['first_known_use']!,
+          _firstKnownUseMeta,
+        ),
+      );
+    }
+    if (data.containsKey('simple_meaning')) {
+      context.handle(
+        _simpleMeaningMeta,
+        simpleMeaning.isAcceptableOrUnknown(
+          data['simple_meaning']!,
+          _simpleMeaningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('contextual_meaning')) {
+      context.handle(
+        _contextualMeaningMeta,
+        contextualMeaning.isAcceptableOrUnknown(
+          data['contextual_meaning']!,
+          _contextualMeaningMeta,
         ),
       );
     }
@@ -133,17 +231,37 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
         DriftSqlType.string,
         data['${effectivePrefix}word'],
       )!,
-      pronunciation: attachedDatabase.typeMapping.read(
+      phonetic: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}pronunciation'],
+        data['${effectivePrefix}phonetic'],
+      ),
+      partOfSpeech: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}part_of_speech'],
+      ),
+      syllables: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}syllables'],
       ),
       cefr: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}cefr'],
       ),
-      partOfSpeech: attachedDatabase.typeMapping.read(
+      etymology: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}part_of_speech'],
+        data['${effectivePrefix}etymology'],
+      ),
+      firstKnownUse: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}first_known_use'],
+      ),
+      simpleMeaning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}simple_meaning'],
+      ),
+      contextualMeaning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}contextual_meaning'],
       ),
     );
   }
@@ -157,29 +275,54 @@ class $WordsTable extends Words with TableInfo<$WordsTable, Word> {
 class Word extends DataClass implements Insertable<Word> {
   final int id;
   final String word;
-  final String? pronunciation;
-  final String? cefr;
+  final String? phonetic;
   final String? partOfSpeech;
+  final String? syllables;
+  final String? cefr;
+  final String? etymology;
+  final String? firstKnownUse;
+  final String? simpleMeaning;
+  final String? contextualMeaning;
   const Word({
     required this.id,
     required this.word,
-    this.pronunciation,
-    this.cefr,
+    this.phonetic,
     this.partOfSpeech,
+    this.syllables,
+    this.cefr,
+    this.etymology,
+    this.firstKnownUse,
+    this.simpleMeaning,
+    this.contextualMeaning,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['word'] = Variable<String>(word);
-    if (!nullToAbsent || pronunciation != null) {
-      map['pronunciation'] = Variable<String>(pronunciation);
+    if (!nullToAbsent || phonetic != null) {
+      map['phonetic'] = Variable<String>(phonetic);
+    }
+    if (!nullToAbsent || partOfSpeech != null) {
+      map['part_of_speech'] = Variable<String>(partOfSpeech);
+    }
+    if (!nullToAbsent || syllables != null) {
+      map['syllables'] = Variable<String>(syllables);
     }
     if (!nullToAbsent || cefr != null) {
       map['cefr'] = Variable<String>(cefr);
     }
-    if (!nullToAbsent || partOfSpeech != null) {
-      map['part_of_speech'] = Variable<String>(partOfSpeech);
+    if (!nullToAbsent || etymology != null) {
+      map['etymology'] = Variable<String>(etymology);
+    }
+    if (!nullToAbsent || firstKnownUse != null) {
+      map['first_known_use'] = Variable<String>(firstKnownUse);
+    }
+    if (!nullToAbsent || simpleMeaning != null) {
+      map['simple_meaning'] = Variable<String>(simpleMeaning);
+    }
+    if (!nullToAbsent || contextualMeaning != null) {
+      map['contextual_meaning'] = Variable<String>(contextualMeaning);
     }
     return map;
   }
@@ -188,13 +331,28 @@ class Word extends DataClass implements Insertable<Word> {
     return WordsCompanion(
       id: Value(id),
       word: Value(word),
-      pronunciation: pronunciation == null && nullToAbsent
+      phonetic: phonetic == null && nullToAbsent
           ? const Value.absent()
-          : Value(pronunciation),
-      cefr: cefr == null && nullToAbsent ? const Value.absent() : Value(cefr),
+          : Value(phonetic),
       partOfSpeech: partOfSpeech == null && nullToAbsent
           ? const Value.absent()
           : Value(partOfSpeech),
+      syllables: syllables == null && nullToAbsent
+          ? const Value.absent()
+          : Value(syllables),
+      cefr: cefr == null && nullToAbsent ? const Value.absent() : Value(cefr),
+      etymology: etymology == null && nullToAbsent
+          ? const Value.absent()
+          : Value(etymology),
+      firstKnownUse: firstKnownUse == null && nullToAbsent
+          ? const Value.absent()
+          : Value(firstKnownUse),
+      simpleMeaning: simpleMeaning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(simpleMeaning),
+      contextualMeaning: contextualMeaning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextualMeaning),
     );
   }
 
@@ -206,9 +364,16 @@ class Word extends DataClass implements Insertable<Word> {
     return Word(
       id: serializer.fromJson<int>(json['id']),
       word: serializer.fromJson<String>(json['word']),
-      pronunciation: serializer.fromJson<String?>(json['pronunciation']),
-      cefr: serializer.fromJson<String?>(json['cefr']),
+      phonetic: serializer.fromJson<String?>(json['phonetic']),
       partOfSpeech: serializer.fromJson<String?>(json['partOfSpeech']),
+      syllables: serializer.fromJson<String?>(json['syllables']),
+      cefr: serializer.fromJson<String?>(json['cefr']),
+      etymology: serializer.fromJson<String?>(json['etymology']),
+      firstKnownUse: serializer.fromJson<String?>(json['firstKnownUse']),
+      simpleMeaning: serializer.fromJson<String?>(json['simpleMeaning']),
+      contextualMeaning: serializer.fromJson<String?>(
+        json['contextualMeaning'],
+      ),
     );
   }
   @override
@@ -217,38 +382,66 @@ class Word extends DataClass implements Insertable<Word> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'word': serializer.toJson<String>(word),
-      'pronunciation': serializer.toJson<String?>(pronunciation),
-      'cefr': serializer.toJson<String?>(cefr),
+      'phonetic': serializer.toJson<String?>(phonetic),
       'partOfSpeech': serializer.toJson<String?>(partOfSpeech),
+      'syllables': serializer.toJson<String?>(syllables),
+      'cefr': serializer.toJson<String?>(cefr),
+      'etymology': serializer.toJson<String?>(etymology),
+      'firstKnownUse': serializer.toJson<String?>(firstKnownUse),
+      'simpleMeaning': serializer.toJson<String?>(simpleMeaning),
+      'contextualMeaning': serializer.toJson<String?>(contextualMeaning),
     };
   }
 
   Word copyWith({
     int? id,
     String? word,
-    Value<String?> pronunciation = const Value.absent(),
-    Value<String?> cefr = const Value.absent(),
+    Value<String?> phonetic = const Value.absent(),
     Value<String?> partOfSpeech = const Value.absent(),
+    Value<String?> syllables = const Value.absent(),
+    Value<String?> cefr = const Value.absent(),
+    Value<String?> etymology = const Value.absent(),
+    Value<String?> firstKnownUse = const Value.absent(),
+    Value<String?> simpleMeaning = const Value.absent(),
+    Value<String?> contextualMeaning = const Value.absent(),
   }) => Word(
     id: id ?? this.id,
     word: word ?? this.word,
-    pronunciation: pronunciation.present
-        ? pronunciation.value
-        : this.pronunciation,
-    cefr: cefr.present ? cefr.value : this.cefr,
+    phonetic: phonetic.present ? phonetic.value : this.phonetic,
     partOfSpeech: partOfSpeech.present ? partOfSpeech.value : this.partOfSpeech,
+    syllables: syllables.present ? syllables.value : this.syllables,
+    cefr: cefr.present ? cefr.value : this.cefr,
+    etymology: etymology.present ? etymology.value : this.etymology,
+    firstKnownUse: firstKnownUse.present
+        ? firstKnownUse.value
+        : this.firstKnownUse,
+    simpleMeaning: simpleMeaning.present
+        ? simpleMeaning.value
+        : this.simpleMeaning,
+    contextualMeaning: contextualMeaning.present
+        ? contextualMeaning.value
+        : this.contextualMeaning,
   );
   Word copyWithCompanion(WordsCompanion data) {
     return Word(
       id: data.id.present ? data.id.value : this.id,
       word: data.word.present ? data.word.value : this.word,
-      pronunciation: data.pronunciation.present
-          ? data.pronunciation.value
-          : this.pronunciation,
-      cefr: data.cefr.present ? data.cefr.value : this.cefr,
+      phonetic: data.phonetic.present ? data.phonetic.value : this.phonetic,
       partOfSpeech: data.partOfSpeech.present
           ? data.partOfSpeech.value
           : this.partOfSpeech,
+      syllables: data.syllables.present ? data.syllables.value : this.syllables,
+      cefr: data.cefr.present ? data.cefr.value : this.cefr,
+      etymology: data.etymology.present ? data.etymology.value : this.etymology,
+      firstKnownUse: data.firstKnownUse.present
+          ? data.firstKnownUse.value
+          : this.firstKnownUse,
+      simpleMeaning: data.simpleMeaning.present
+          ? data.simpleMeaning.value
+          : this.simpleMeaning,
+      contextualMeaning: data.contextualMeaning.present
+          ? data.contextualMeaning.value
+          : this.contextualMeaning,
     );
   }
 
@@ -257,75 +450,131 @@ class Word extends DataClass implements Insertable<Word> {
     return (StringBuffer('Word(')
           ..write('id: $id, ')
           ..write('word: $word, ')
-          ..write('pronunciation: $pronunciation, ')
+          ..write('phonetic: $phonetic, ')
+          ..write('partOfSpeech: $partOfSpeech, ')
+          ..write('syllables: $syllables, ')
           ..write('cefr: $cefr, ')
-          ..write('partOfSpeech: $partOfSpeech')
+          ..write('etymology: $etymology, ')
+          ..write('firstKnownUse: $firstKnownUse, ')
+          ..write('simpleMeaning: $simpleMeaning, ')
+          ..write('contextualMeaning: $contextualMeaning')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, word, pronunciation, cefr, partOfSpeech);
+  int get hashCode => Object.hash(
+    id,
+    word,
+    phonetic,
+    partOfSpeech,
+    syllables,
+    cefr,
+    etymology,
+    firstKnownUse,
+    simpleMeaning,
+    contextualMeaning,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Word &&
           other.id == this.id &&
           other.word == this.word &&
-          other.pronunciation == this.pronunciation &&
+          other.phonetic == this.phonetic &&
+          other.partOfSpeech == this.partOfSpeech &&
+          other.syllables == this.syllables &&
           other.cefr == this.cefr &&
-          other.partOfSpeech == this.partOfSpeech);
+          other.etymology == this.etymology &&
+          other.firstKnownUse == this.firstKnownUse &&
+          other.simpleMeaning == this.simpleMeaning &&
+          other.contextualMeaning == this.contextualMeaning);
 }
 
 class WordsCompanion extends UpdateCompanion<Word> {
   final Value<int> id;
   final Value<String> word;
-  final Value<String?> pronunciation;
-  final Value<String?> cefr;
+  final Value<String?> phonetic;
   final Value<String?> partOfSpeech;
+  final Value<String?> syllables;
+  final Value<String?> cefr;
+  final Value<String?> etymology;
+  final Value<String?> firstKnownUse;
+  final Value<String?> simpleMeaning;
+  final Value<String?> contextualMeaning;
   const WordsCompanion({
     this.id = const Value.absent(),
     this.word = const Value.absent(),
-    this.pronunciation = const Value.absent(),
-    this.cefr = const Value.absent(),
+    this.phonetic = const Value.absent(),
     this.partOfSpeech = const Value.absent(),
+    this.syllables = const Value.absent(),
+    this.cefr = const Value.absent(),
+    this.etymology = const Value.absent(),
+    this.firstKnownUse = const Value.absent(),
+    this.simpleMeaning = const Value.absent(),
+    this.contextualMeaning = const Value.absent(),
   });
   WordsCompanion.insert({
     this.id = const Value.absent(),
     required String word,
-    this.pronunciation = const Value.absent(),
-    this.cefr = const Value.absent(),
+    this.phonetic = const Value.absent(),
     this.partOfSpeech = const Value.absent(),
+    this.syllables = const Value.absent(),
+    this.cefr = const Value.absent(),
+    this.etymology = const Value.absent(),
+    this.firstKnownUse = const Value.absent(),
+    this.simpleMeaning = const Value.absent(),
+    this.contextualMeaning = const Value.absent(),
   }) : word = Value(word);
   static Insertable<Word> custom({
     Expression<int>? id,
     Expression<String>? word,
-    Expression<String>? pronunciation,
-    Expression<String>? cefr,
+    Expression<String>? phonetic,
     Expression<String>? partOfSpeech,
+    Expression<String>? syllables,
+    Expression<String>? cefr,
+    Expression<String>? etymology,
+    Expression<String>? firstKnownUse,
+    Expression<String>? simpleMeaning,
+    Expression<String>? contextualMeaning,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (word != null) 'word': word,
-      if (pronunciation != null) 'pronunciation': pronunciation,
-      if (cefr != null) 'cefr': cefr,
+      if (phonetic != null) 'phonetic': phonetic,
       if (partOfSpeech != null) 'part_of_speech': partOfSpeech,
+      if (syllables != null) 'syllables': syllables,
+      if (cefr != null) 'cefr': cefr,
+      if (etymology != null) 'etymology': etymology,
+      if (firstKnownUse != null) 'first_known_use': firstKnownUse,
+      if (simpleMeaning != null) 'simple_meaning': simpleMeaning,
+      if (contextualMeaning != null) 'contextual_meaning': contextualMeaning,
     });
   }
 
   WordsCompanion copyWith({
     Value<int>? id,
     Value<String>? word,
-    Value<String?>? pronunciation,
-    Value<String?>? cefr,
+    Value<String?>? phonetic,
     Value<String?>? partOfSpeech,
+    Value<String?>? syllables,
+    Value<String?>? cefr,
+    Value<String?>? etymology,
+    Value<String?>? firstKnownUse,
+    Value<String?>? simpleMeaning,
+    Value<String?>? contextualMeaning,
   }) {
     return WordsCompanion(
       id: id ?? this.id,
       word: word ?? this.word,
-      pronunciation: pronunciation ?? this.pronunciation,
-      cefr: cefr ?? this.cefr,
+      phonetic: phonetic ?? this.phonetic,
       partOfSpeech: partOfSpeech ?? this.partOfSpeech,
+      syllables: syllables ?? this.syllables,
+      cefr: cefr ?? this.cefr,
+      etymology: etymology ?? this.etymology,
+      firstKnownUse: firstKnownUse ?? this.firstKnownUse,
+      simpleMeaning: simpleMeaning ?? this.simpleMeaning,
+      contextualMeaning: contextualMeaning ?? this.contextualMeaning,
     );
   }
 
@@ -338,14 +587,29 @@ class WordsCompanion extends UpdateCompanion<Word> {
     if (word.present) {
       map['word'] = Variable<String>(word.value);
     }
-    if (pronunciation.present) {
-      map['pronunciation'] = Variable<String>(pronunciation.value);
+    if (phonetic.present) {
+      map['phonetic'] = Variable<String>(phonetic.value);
+    }
+    if (partOfSpeech.present) {
+      map['part_of_speech'] = Variable<String>(partOfSpeech.value);
+    }
+    if (syllables.present) {
+      map['syllables'] = Variable<String>(syllables.value);
     }
     if (cefr.present) {
       map['cefr'] = Variable<String>(cefr.value);
     }
-    if (partOfSpeech.present) {
-      map['part_of_speech'] = Variable<String>(partOfSpeech.value);
+    if (etymology.present) {
+      map['etymology'] = Variable<String>(etymology.value);
+    }
+    if (firstKnownUse.present) {
+      map['first_known_use'] = Variable<String>(firstKnownUse.value);
+    }
+    if (simpleMeaning.present) {
+      map['simple_meaning'] = Variable<String>(simpleMeaning.value);
+    }
+    if (contextualMeaning.present) {
+      map['contextual_meaning'] = Variable<String>(contextualMeaning.value);
     }
     return map;
   }
@@ -355,9 +619,14 @@ class WordsCompanion extends UpdateCompanion<Word> {
     return (StringBuffer('WordsCompanion(')
           ..write('id: $id, ')
           ..write('word: $word, ')
-          ..write('pronunciation: $pronunciation, ')
+          ..write('phonetic: $phonetic, ')
+          ..write('partOfSpeech: $partOfSpeech, ')
+          ..write('syllables: $syllables, ')
           ..write('cefr: $cefr, ')
-          ..write('partOfSpeech: $partOfSpeech')
+          ..write('etymology: $etymology, ')
+          ..write('firstKnownUse: $firstKnownUse, ')
+          ..write('simpleMeaning: $simpleMeaning, ')
+          ..write('contextualMeaning: $contextualMeaning')
           ..write(')'))
         .toString();
   }
@@ -391,33 +660,48 @@ class $DefinitionsTable extends Definitions
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES words (id)',
+      'REFERENCES words (id) ON DELETE CASCADE',
     ),
   );
-  static const VerificationMeta _meaningMeta = const VerificationMeta(
-    'meaning',
+  static const VerificationMeta _senseNumberMeta = const VerificationMeta(
+    'senseNumber',
   );
   @override
-  late final GeneratedColumn<String> meaning = GeneratedColumn<String>(
-    'meaning',
+  late final GeneratedColumn<String> senseNumber = GeneratedColumn<String>(
+    'sense_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _definitionMeta = const VerificationMeta(
+    'definition',
+  );
+  @override
+  late final GeneratedColumn<String> definition = GeneratedColumn<String>(
+    'definition',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _simpleEnglishMeta = const VerificationMeta(
-    'simpleEnglish',
-  );
+  static const VerificationMeta _labelsMeta = const VerificationMeta('labels');
   @override
-  late final GeneratedColumn<String> simpleEnglish = GeneratedColumn<String>(
-    'simple_english',
+  late final GeneratedColumn<String> labels = GeneratedColumn<String>(
+    'labels',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, wordId, meaning, simpleEnglish];
+  List<GeneratedColumn> get $columns => [
+    id,
+    wordId,
+    senseNumber,
+    definition,
+    labels,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -441,21 +725,27 @@ class $DefinitionsTable extends Definitions
     } else if (isInserting) {
       context.missing(_wordIdMeta);
     }
-    if (data.containsKey('meaning')) {
+    if (data.containsKey('sense_number')) {
       context.handle(
-        _meaningMeta,
-        meaning.isAcceptableOrUnknown(data['meaning']!, _meaningMeta),
+        _senseNumberMeta,
+        senseNumber.isAcceptableOrUnknown(
+          data['sense_number']!,
+          _senseNumberMeta,
+        ),
+      );
+    }
+    if (data.containsKey('definition')) {
+      context.handle(
+        _definitionMeta,
+        definition.isAcceptableOrUnknown(data['definition']!, _definitionMeta),
       );
     } else if (isInserting) {
-      context.missing(_meaningMeta);
+      context.missing(_definitionMeta);
     }
-    if (data.containsKey('simple_english')) {
+    if (data.containsKey('labels')) {
       context.handle(
-        _simpleEnglishMeta,
-        simpleEnglish.isAcceptableOrUnknown(
-          data['simple_english']!,
-          _simpleEnglishMeta,
-        ),
+        _labelsMeta,
+        labels.isAcceptableOrUnknown(data['labels']!, _labelsMeta),
       );
     }
     return context;
@@ -475,13 +765,17 @@ class $DefinitionsTable extends Definitions
         DriftSqlType.int,
         data['${effectivePrefix}word_id'],
       )!,
-      meaning: attachedDatabase.typeMapping.read(
+      senseNumber: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}meaning'],
+        data['${effectivePrefix}sense_number'],
+      ),
+      definition: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}definition'],
       )!,
-      simpleEnglish: attachedDatabase.typeMapping.read(
+      labels: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}simple_english'],
+        data['${effectivePrefix}labels'],
       ),
     );
   }
@@ -495,22 +789,27 @@ class $DefinitionsTable extends Definitions
 class Definition extends DataClass implements Insertable<Definition> {
   final int id;
   final int wordId;
-  final String meaning;
-  final String? simpleEnglish;
+  final String? senseNumber;
+  final String definition;
+  final String? labels;
   const Definition({
     required this.id,
     required this.wordId,
-    required this.meaning,
-    this.simpleEnglish,
+    this.senseNumber,
+    required this.definition,
+    this.labels,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['word_id'] = Variable<int>(wordId);
-    map['meaning'] = Variable<String>(meaning);
-    if (!nullToAbsent || simpleEnglish != null) {
-      map['simple_english'] = Variable<String>(simpleEnglish);
+    if (!nullToAbsent || senseNumber != null) {
+      map['sense_number'] = Variable<String>(senseNumber);
+    }
+    map['definition'] = Variable<String>(definition);
+    if (!nullToAbsent || labels != null) {
+      map['labels'] = Variable<String>(labels);
     }
     return map;
   }
@@ -519,10 +818,13 @@ class Definition extends DataClass implements Insertable<Definition> {
     return DefinitionsCompanion(
       id: Value(id),
       wordId: Value(wordId),
-      meaning: Value(meaning),
-      simpleEnglish: simpleEnglish == null && nullToAbsent
+      senseNumber: senseNumber == null && nullToAbsent
           ? const Value.absent()
-          : Value(simpleEnglish),
+          : Value(senseNumber),
+      definition: Value(definition),
+      labels: labels == null && nullToAbsent
+          ? const Value.absent()
+          : Value(labels),
     );
   }
 
@@ -534,8 +836,9 @@ class Definition extends DataClass implements Insertable<Definition> {
     return Definition(
       id: serializer.fromJson<int>(json['id']),
       wordId: serializer.fromJson<int>(json['wordId']),
-      meaning: serializer.fromJson<String>(json['meaning']),
-      simpleEnglish: serializer.fromJson<String?>(json['simpleEnglish']),
+      senseNumber: serializer.fromJson<String?>(json['senseNumber']),
+      definition: serializer.fromJson<String>(json['definition']),
+      labels: serializer.fromJson<String?>(json['labels']),
     );
   }
   @override
@@ -544,32 +847,36 @@ class Definition extends DataClass implements Insertable<Definition> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'wordId': serializer.toJson<int>(wordId),
-      'meaning': serializer.toJson<String>(meaning),
-      'simpleEnglish': serializer.toJson<String?>(simpleEnglish),
+      'senseNumber': serializer.toJson<String?>(senseNumber),
+      'definition': serializer.toJson<String>(definition),
+      'labels': serializer.toJson<String?>(labels),
     };
   }
 
   Definition copyWith({
     int? id,
     int? wordId,
-    String? meaning,
-    Value<String?> simpleEnglish = const Value.absent(),
+    Value<String?> senseNumber = const Value.absent(),
+    String? definition,
+    Value<String?> labels = const Value.absent(),
   }) => Definition(
     id: id ?? this.id,
     wordId: wordId ?? this.wordId,
-    meaning: meaning ?? this.meaning,
-    simpleEnglish: simpleEnglish.present
-        ? simpleEnglish.value
-        : this.simpleEnglish,
+    senseNumber: senseNumber.present ? senseNumber.value : this.senseNumber,
+    definition: definition ?? this.definition,
+    labels: labels.present ? labels.value : this.labels,
   );
   Definition copyWithCompanion(DefinitionsCompanion data) {
     return Definition(
       id: data.id.present ? data.id.value : this.id,
       wordId: data.wordId.present ? data.wordId.value : this.wordId,
-      meaning: data.meaning.present ? data.meaning.value : this.meaning,
-      simpleEnglish: data.simpleEnglish.present
-          ? data.simpleEnglish.value
-          : this.simpleEnglish,
+      senseNumber: data.senseNumber.present
+          ? data.senseNumber.value
+          : this.senseNumber,
+      definition: data.definition.present
+          ? data.definition.value
+          : this.definition,
+      labels: data.labels.present ? data.labels.value : this.labels,
     );
   }
 
@@ -578,67 +885,76 @@ class Definition extends DataClass implements Insertable<Definition> {
     return (StringBuffer('Definition(')
           ..write('id: $id, ')
           ..write('wordId: $wordId, ')
-          ..write('meaning: $meaning, ')
-          ..write('simpleEnglish: $simpleEnglish')
+          ..write('senseNumber: $senseNumber, ')
+          ..write('definition: $definition, ')
+          ..write('labels: $labels')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, wordId, meaning, simpleEnglish);
+  int get hashCode => Object.hash(id, wordId, senseNumber, definition, labels);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Definition &&
           other.id == this.id &&
           other.wordId == this.wordId &&
-          other.meaning == this.meaning &&
-          other.simpleEnglish == this.simpleEnglish);
+          other.senseNumber == this.senseNumber &&
+          other.definition == this.definition &&
+          other.labels == this.labels);
 }
 
 class DefinitionsCompanion extends UpdateCompanion<Definition> {
   final Value<int> id;
   final Value<int> wordId;
-  final Value<String> meaning;
-  final Value<String?> simpleEnglish;
+  final Value<String?> senseNumber;
+  final Value<String> definition;
+  final Value<String?> labels;
   const DefinitionsCompanion({
     this.id = const Value.absent(),
     this.wordId = const Value.absent(),
-    this.meaning = const Value.absent(),
-    this.simpleEnglish = const Value.absent(),
+    this.senseNumber = const Value.absent(),
+    this.definition = const Value.absent(),
+    this.labels = const Value.absent(),
   });
   DefinitionsCompanion.insert({
     this.id = const Value.absent(),
     required int wordId,
-    required String meaning,
-    this.simpleEnglish = const Value.absent(),
+    this.senseNumber = const Value.absent(),
+    required String definition,
+    this.labels = const Value.absent(),
   }) : wordId = Value(wordId),
-       meaning = Value(meaning);
+       definition = Value(definition);
   static Insertable<Definition> custom({
     Expression<int>? id,
     Expression<int>? wordId,
-    Expression<String>? meaning,
-    Expression<String>? simpleEnglish,
+    Expression<String>? senseNumber,
+    Expression<String>? definition,
+    Expression<String>? labels,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (wordId != null) 'word_id': wordId,
-      if (meaning != null) 'meaning': meaning,
-      if (simpleEnglish != null) 'simple_english': simpleEnglish,
+      if (senseNumber != null) 'sense_number': senseNumber,
+      if (definition != null) 'definition': definition,
+      if (labels != null) 'labels': labels,
     });
   }
 
   DefinitionsCompanion copyWith({
     Value<int>? id,
     Value<int>? wordId,
-    Value<String>? meaning,
-    Value<String?>? simpleEnglish,
+    Value<String?>? senseNumber,
+    Value<String>? definition,
+    Value<String?>? labels,
   }) {
     return DefinitionsCompanion(
       id: id ?? this.id,
       wordId: wordId ?? this.wordId,
-      meaning: meaning ?? this.meaning,
-      simpleEnglish: simpleEnglish ?? this.simpleEnglish,
+      senseNumber: senseNumber ?? this.senseNumber,
+      definition: definition ?? this.definition,
+      labels: labels ?? this.labels,
     );
   }
 
@@ -651,11 +967,14 @@ class DefinitionsCompanion extends UpdateCompanion<Definition> {
     if (wordId.present) {
       map['word_id'] = Variable<int>(wordId.value);
     }
-    if (meaning.present) {
-      map['meaning'] = Variable<String>(meaning.value);
+    if (senseNumber.present) {
+      map['sense_number'] = Variable<String>(senseNumber.value);
     }
-    if (simpleEnglish.present) {
-      map['simple_english'] = Variable<String>(simpleEnglish.value);
+    if (definition.present) {
+      map['definition'] = Variable<String>(definition.value);
+    }
+    if (labels.present) {
+      map['labels'] = Variable<String>(labels.value);
     }
     return map;
   }
@@ -665,8 +984,9 @@ class DefinitionsCompanion extends UpdateCompanion<Definition> {
     return (StringBuffer('DefinitionsCompanion(')
           ..write('id: $id, ')
           ..write('wordId: $wordId, ')
-          ..write('meaning: $meaning, ')
-          ..write('simpleEnglish: $simpleEnglish')
+          ..write('senseNumber: $senseNumber, ')
+          ..write('definition: $definition, ')
+          ..write('labels: $labels')
           ..write(')'))
         .toString();
   }
@@ -701,22 +1021,22 @@ class $ExamplesTable extends Examples with TableInfo<$ExamplesTable, Example> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES definitions (id)',
+      'REFERENCES definitions (id) ON DELETE CASCADE',
     ),
   );
-  static const VerificationMeta _sentenceMeta = const VerificationMeta(
-    'sentence',
+  static const VerificationMeta _exampleTextMeta = const VerificationMeta(
+    'exampleText',
   );
   @override
-  late final GeneratedColumn<String> sentence = GeneratedColumn<String>(
-    'sentence',
+  late final GeneratedColumn<String> exampleText = GeneratedColumn<String>(
+    'example_text',
     aliasedName,
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, definitionId, sentence];
+  List<GeneratedColumn> get $columns => [id, definitionId, exampleText];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -743,13 +1063,16 @@ class $ExamplesTable extends Examples with TableInfo<$ExamplesTable, Example> {
     } else if (isInserting) {
       context.missing(_definitionIdMeta);
     }
-    if (data.containsKey('sentence')) {
+    if (data.containsKey('example_text')) {
       context.handle(
-        _sentenceMeta,
-        sentence.isAcceptableOrUnknown(data['sentence']!, _sentenceMeta),
+        _exampleTextMeta,
+        exampleText.isAcceptableOrUnknown(
+          data['example_text']!,
+          _exampleTextMeta,
+        ),
       );
     } else if (isInserting) {
-      context.missing(_sentenceMeta);
+      context.missing(_exampleTextMeta);
     }
     return context;
   }
@@ -768,9 +1091,9 @@ class $ExamplesTable extends Examples with TableInfo<$ExamplesTable, Example> {
         DriftSqlType.int,
         data['${effectivePrefix}definition_id'],
       )!,
-      sentence: attachedDatabase.typeMapping.read(
+      exampleText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}sentence'],
+        data['${effectivePrefix}example_text'],
       )!,
     );
   }
@@ -784,18 +1107,18 @@ class $ExamplesTable extends Examples with TableInfo<$ExamplesTable, Example> {
 class Example extends DataClass implements Insertable<Example> {
   final int id;
   final int definitionId;
-  final String sentence;
+  final String exampleText;
   const Example({
     required this.id,
     required this.definitionId,
-    required this.sentence,
+    required this.exampleText,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['definition_id'] = Variable<int>(definitionId);
-    map['sentence'] = Variable<String>(sentence);
+    map['example_text'] = Variable<String>(exampleText);
     return map;
   }
 
@@ -803,7 +1126,7 @@ class Example extends DataClass implements Insertable<Example> {
     return ExamplesCompanion(
       id: Value(id),
       definitionId: Value(definitionId),
-      sentence: Value(sentence),
+      exampleText: Value(exampleText),
     );
   }
 
@@ -815,7 +1138,7 @@ class Example extends DataClass implements Insertable<Example> {
     return Example(
       id: serializer.fromJson<int>(json['id']),
       definitionId: serializer.fromJson<int>(json['definitionId']),
-      sentence: serializer.fromJson<String>(json['sentence']),
+      exampleText: serializer.fromJson<String>(json['exampleText']),
     );
   }
   @override
@@ -824,22 +1147,25 @@ class Example extends DataClass implements Insertable<Example> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'definitionId': serializer.toJson<int>(definitionId),
-      'sentence': serializer.toJson<String>(sentence),
+      'exampleText': serializer.toJson<String>(exampleText),
     };
   }
 
-  Example copyWith({int? id, int? definitionId, String? sentence}) => Example(
-    id: id ?? this.id,
-    definitionId: definitionId ?? this.definitionId,
-    sentence: sentence ?? this.sentence,
-  );
+  Example copyWith({int? id, int? definitionId, String? exampleText}) =>
+      Example(
+        id: id ?? this.id,
+        definitionId: definitionId ?? this.definitionId,
+        exampleText: exampleText ?? this.exampleText,
+      );
   Example copyWithCompanion(ExamplesCompanion data) {
     return Example(
       id: data.id.present ? data.id.value : this.id,
       definitionId: data.definitionId.present
           ? data.definitionId.value
           : this.definitionId,
-      sentence: data.sentence.present ? data.sentence.value : this.sentence,
+      exampleText: data.exampleText.present
+          ? data.exampleText.value
+          : this.exampleText,
     );
   }
 
@@ -848,58 +1174,58 @@ class Example extends DataClass implements Insertable<Example> {
     return (StringBuffer('Example(')
           ..write('id: $id, ')
           ..write('definitionId: $definitionId, ')
-          ..write('sentence: $sentence')
+          ..write('exampleText: $exampleText')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, definitionId, sentence);
+  int get hashCode => Object.hash(id, definitionId, exampleText);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Example &&
           other.id == this.id &&
           other.definitionId == this.definitionId &&
-          other.sentence == this.sentence);
+          other.exampleText == this.exampleText);
 }
 
 class ExamplesCompanion extends UpdateCompanion<Example> {
   final Value<int> id;
   final Value<int> definitionId;
-  final Value<String> sentence;
+  final Value<String> exampleText;
   const ExamplesCompanion({
     this.id = const Value.absent(),
     this.definitionId = const Value.absent(),
-    this.sentence = const Value.absent(),
+    this.exampleText = const Value.absent(),
   });
   ExamplesCompanion.insert({
     this.id = const Value.absent(),
     required int definitionId,
-    required String sentence,
+    required String exampleText,
   }) : definitionId = Value(definitionId),
-       sentence = Value(sentence);
+       exampleText = Value(exampleText);
   static Insertable<Example> custom({
     Expression<int>? id,
     Expression<int>? definitionId,
-    Expression<String>? sentence,
+    Expression<String>? exampleText,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (definitionId != null) 'definition_id': definitionId,
-      if (sentence != null) 'sentence': sentence,
+      if (exampleText != null) 'example_text': exampleText,
     });
   }
 
   ExamplesCompanion copyWith({
     Value<int>? id,
     Value<int>? definitionId,
-    Value<String>? sentence,
+    Value<String>? exampleText,
   }) {
     return ExamplesCompanion(
       id: id ?? this.id,
       definitionId: definitionId ?? this.definitionId,
-      sentence: sentence ?? this.sentence,
+      exampleText: exampleText ?? this.exampleText,
     );
   }
 
@@ -912,8 +1238,8 @@ class ExamplesCompanion extends UpdateCompanion<Example> {
     if (definitionId.present) {
       map['definition_id'] = Variable<int>(definitionId.value);
     }
-    if (sentence.present) {
-      map['sentence'] = Variable<String>(sentence.value);
+    if (exampleText.present) {
+      map['example_text'] = Variable<String>(exampleText.value);
     }
     return map;
   }
@@ -923,7 +1249,7 @@ class ExamplesCompanion extends UpdateCompanion<Example> {
     return (StringBuffer('ExamplesCompanion(')
           ..write('id: $id, ')
           ..write('definitionId: $definitionId, ')
-          ..write('sentence: $sentence')
+          ..write('exampleText: $exampleText')
           ..write(')'))
         .toString();
   }
@@ -1806,6 +2132,15 @@ class $CollectionsTable extends Collections
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isSmartMeta = const VerificationMeta(
     'isSmart',
   );
@@ -1850,6 +2185,7 @@ class $CollectionsTable extends Collections
     description,
     colorHex,
     iconName,
+    tags,
     isSmart,
     smartType,
     createdAt,
@@ -1896,6 +2232,12 @@ class $CollectionsTable extends Collections
       context.handle(
         _iconNameMeta,
         iconName.isAcceptableOrUnknown(data['icon_name']!, _iconNameMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
       );
     }
     if (data.containsKey('is_smart')) {
@@ -1947,6 +2289,10 @@ class $CollectionsTable extends Collections
         DriftSqlType.string,
         data['${effectivePrefix}icon_name'],
       ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      ),
       isSmart: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_smart'],
@@ -1974,6 +2320,7 @@ class Collection extends DataClass implements Insertable<Collection> {
   final String? description;
   final String colorHex;
   final String? iconName;
+  final String? tags;
   final bool isSmart;
   final String? smartType;
   final DateTime createdAt;
@@ -1983,6 +2330,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     this.description,
     required this.colorHex,
     this.iconName,
+    this.tags,
     required this.isSmart,
     this.smartType,
     required this.createdAt,
@@ -1998,6 +2346,9 @@ class Collection extends DataClass implements Insertable<Collection> {
     map['color_hex'] = Variable<String>(colorHex);
     if (!nullToAbsent || iconName != null) {
       map['icon_name'] = Variable<String>(iconName);
+    }
+    if (!nullToAbsent || tags != null) {
+      map['tags'] = Variable<String>(tags);
     }
     map['is_smart'] = Variable<bool>(isSmart);
     if (!nullToAbsent || smartType != null) {
@@ -2018,6 +2369,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       iconName: iconName == null && nullToAbsent
           ? const Value.absent()
           : Value(iconName),
+      tags: tags == null && nullToAbsent ? const Value.absent() : Value(tags),
       isSmart: Value(isSmart),
       smartType: smartType == null && nullToAbsent
           ? const Value.absent()
@@ -2037,6 +2389,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       description: serializer.fromJson<String?>(json['description']),
       colorHex: serializer.fromJson<String>(json['colorHex']),
       iconName: serializer.fromJson<String?>(json['iconName']),
+      tags: serializer.fromJson<String?>(json['tags']),
       isSmart: serializer.fromJson<bool>(json['isSmart']),
       smartType: serializer.fromJson<String?>(json['smartType']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2051,6 +2404,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       'description': serializer.toJson<String?>(description),
       'colorHex': serializer.toJson<String>(colorHex),
       'iconName': serializer.toJson<String?>(iconName),
+      'tags': serializer.toJson<String?>(tags),
       'isSmart': serializer.toJson<bool>(isSmart),
       'smartType': serializer.toJson<String?>(smartType),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2063,6 +2417,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     Value<String?> description = const Value.absent(),
     String? colorHex,
     Value<String?> iconName = const Value.absent(),
+    Value<String?> tags = const Value.absent(),
     bool? isSmart,
     Value<String?> smartType = const Value.absent(),
     DateTime? createdAt,
@@ -2072,6 +2427,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     description: description.present ? description.value : this.description,
     colorHex: colorHex ?? this.colorHex,
     iconName: iconName.present ? iconName.value : this.iconName,
+    tags: tags.present ? tags.value : this.tags,
     isSmart: isSmart ?? this.isSmart,
     smartType: smartType.present ? smartType.value : this.smartType,
     createdAt: createdAt ?? this.createdAt,
@@ -2085,6 +2441,7 @@ class Collection extends DataClass implements Insertable<Collection> {
           : this.description,
       colorHex: data.colorHex.present ? data.colorHex.value : this.colorHex,
       iconName: data.iconName.present ? data.iconName.value : this.iconName,
+      tags: data.tags.present ? data.tags.value : this.tags,
       isSmart: data.isSmart.present ? data.isSmart.value : this.isSmart,
       smartType: data.smartType.present ? data.smartType.value : this.smartType,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -2099,6 +2456,7 @@ class Collection extends DataClass implements Insertable<Collection> {
           ..write('description: $description, ')
           ..write('colorHex: $colorHex, ')
           ..write('iconName: $iconName, ')
+          ..write('tags: $tags, ')
           ..write('isSmart: $isSmart, ')
           ..write('smartType: $smartType, ')
           ..write('createdAt: $createdAt')
@@ -2113,6 +2471,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     description,
     colorHex,
     iconName,
+    tags,
     isSmart,
     smartType,
     createdAt,
@@ -2126,6 +2485,7 @@ class Collection extends DataClass implements Insertable<Collection> {
           other.description == this.description &&
           other.colorHex == this.colorHex &&
           other.iconName == this.iconName &&
+          other.tags == this.tags &&
           other.isSmart == this.isSmart &&
           other.smartType == this.smartType &&
           other.createdAt == this.createdAt);
@@ -2137,6 +2497,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
   final Value<String?> description;
   final Value<String> colorHex;
   final Value<String?> iconName;
+  final Value<String?> tags;
   final Value<bool> isSmart;
   final Value<String?> smartType;
   final Value<DateTime> createdAt;
@@ -2146,6 +2507,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     this.description = const Value.absent(),
     this.colorHex = const Value.absent(),
     this.iconName = const Value.absent(),
+    this.tags = const Value.absent(),
     this.isSmart = const Value.absent(),
     this.smartType = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2156,6 +2518,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     this.description = const Value.absent(),
     this.colorHex = const Value.absent(),
     this.iconName = const Value.absent(),
+    this.tags = const Value.absent(),
     this.isSmart = const Value.absent(),
     this.smartType = const Value.absent(),
     required DateTime createdAt,
@@ -2167,6 +2530,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Expression<String>? description,
     Expression<String>? colorHex,
     Expression<String>? iconName,
+    Expression<String>? tags,
     Expression<bool>? isSmart,
     Expression<String>? smartType,
     Expression<DateTime>? createdAt,
@@ -2177,6 +2541,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       if (description != null) 'description': description,
       if (colorHex != null) 'color_hex': colorHex,
       if (iconName != null) 'icon_name': iconName,
+      if (tags != null) 'tags': tags,
       if (isSmart != null) 'is_smart': isSmart,
       if (smartType != null) 'smart_type': smartType,
       if (createdAt != null) 'created_at': createdAt,
@@ -2189,6 +2554,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Value<String?>? description,
     Value<String>? colorHex,
     Value<String?>? iconName,
+    Value<String?>? tags,
     Value<bool>? isSmart,
     Value<String?>? smartType,
     Value<DateTime>? createdAt,
@@ -2199,6 +2565,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       description: description ?? this.description,
       colorHex: colorHex ?? this.colorHex,
       iconName: iconName ?? this.iconName,
+      tags: tags ?? this.tags,
       isSmart: isSmart ?? this.isSmart,
       smartType: smartType ?? this.smartType,
       createdAt: createdAt ?? this.createdAt,
@@ -2223,6 +2590,9 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     if (iconName.present) {
       map['icon_name'] = Variable<String>(iconName.value);
     }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
     if (isSmart.present) {
       map['is_smart'] = Variable<bool>(isSmart.value);
     }
@@ -2243,6 +2613,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
           ..write('description: $description, ')
           ..write('colorHex: $colorHex, ')
           ..write('iconName: $iconName, ')
+          ..write('tags: $tags, ')
           ..write('isSmart: $isSmart, ')
           ..write('smartType: $smartType, ')
           ..write('createdAt: $createdAt')
@@ -2817,6 +3188,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'words',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('definitions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'definitions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('examples', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'collections',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -2835,16 +3220,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$WordsTableCreateCompanionBuilder = WordsCompanion Function({
   Value<int> id,
   required String word,
-  Value<String?> pronunciation,
-  Value<String?> cefr,
+  Value<String?> phonetic,
   Value<String?> partOfSpeech,
+  Value<String?> syllables,
+  Value<String?> cefr,
+  Value<String?> etymology,
+  Value<String?> firstKnownUse,
+  Value<String?> simpleMeaning,
+  Value<String?> contextualMeaning,
 });
 typedef $$WordsTableUpdateCompanionBuilder = WordsCompanion Function({
   Value<int> id,
   Value<String> word,
-  Value<String?> pronunciation,
-  Value<String?> cefr,
+  Value<String?> phonetic,
   Value<String?> partOfSpeech,
+  Value<String?> syllables,
+  Value<String?> cefr,
+  Value<String?> etymology,
+  Value<String?> firstKnownUse,
+  Value<String?> simpleMeaning,
+  Value<String?> contextualMeaning,
 });
 
 final class $$WordsTableReferences
@@ -2888,8 +3283,18 @@ class $$WordsTableFilterComposer extends Composer<_$AppDatabase, $WordsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get pronunciation => $composableBuilder(
-    column: $table.pronunciation,
+  ColumnFilters<String> get phonetic => $composableBuilder(
+    column: $table.phonetic,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get partOfSpeech => $composableBuilder(
+    column: $table.partOfSpeech,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syllables => $composableBuilder(
+    column: $table.syllables,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2898,8 +3303,23 @@ class $$WordsTableFilterComposer extends Composer<_$AppDatabase, $WordsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get partOfSpeech => $composableBuilder(
-    column: $table.partOfSpeech,
+  ColumnFilters<String> get etymology => $composableBuilder(
+    column: $table.etymology,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get firstKnownUse => $composableBuilder(
+    column: $table.firstKnownUse,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get simpleMeaning => $composableBuilder(
+    column: $table.simpleMeaning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contextualMeaning => $composableBuilder(
+    column: $table.contextualMeaning,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2948,8 +3368,18 @@ class $$WordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get pronunciation => $composableBuilder(
-    column: $table.pronunciation,
+  ColumnOrderings<String> get phonetic => $composableBuilder(
+    column: $table.phonetic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get partOfSpeech => $composableBuilder(
+    column: $table.partOfSpeech,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syllables => $composableBuilder(
+    column: $table.syllables,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -2958,8 +3388,23 @@ class $$WordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get partOfSpeech => $composableBuilder(
-    column: $table.partOfSpeech,
+  ColumnOrderings<String> get etymology => $composableBuilder(
+    column: $table.etymology,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get firstKnownUse => $composableBuilder(
+    column: $table.firstKnownUse,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get simpleMeaning => $composableBuilder(
+    column: $table.simpleMeaning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contextualMeaning => $composableBuilder(
+    column: $table.contextualMeaning,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -2979,16 +3424,35 @@ class $$WordsTableAnnotationComposer
   GeneratedColumn<String> get word =>
       $composableBuilder(column: $table.word, builder: (column) => column);
 
-  GeneratedColumn<String> get pronunciation => $composableBuilder(
-    column: $table.pronunciation,
+  GeneratedColumn<String> get phonetic =>
+      $composableBuilder(column: $table.phonetic, builder: (column) => column);
+
+  GeneratedColumn<String> get partOfSpeech => $composableBuilder(
+    column: $table.partOfSpeech,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get syllables =>
+      $composableBuilder(column: $table.syllables, builder: (column) => column);
 
   GeneratedColumn<String> get cefr =>
       $composableBuilder(column: $table.cefr, builder: (column) => column);
 
-  GeneratedColumn<String> get partOfSpeech => $composableBuilder(
-    column: $table.partOfSpeech,
+  GeneratedColumn<String> get etymology =>
+      $composableBuilder(column: $table.etymology, builder: (column) => column);
+
+  GeneratedColumn<String> get firstKnownUse => $composableBuilder(
+    column: $table.firstKnownUse,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get simpleMeaning => $composableBuilder(
+    column: $table.simpleMeaning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contextualMeaning => $composableBuilder(
+    column: $table.contextualMeaning,
     builder: (column) => column,
   );
 
@@ -3048,29 +3512,49 @@ class $$WordsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> word = const Value.absent(),
-                Value<String?> pronunciation = const Value.absent(),
-                Value<String?> cefr = const Value.absent(),
+                Value<String?> phonetic = const Value.absent(),
                 Value<String?> partOfSpeech = const Value.absent(),
+                Value<String?> syllables = const Value.absent(),
+                Value<String?> cefr = const Value.absent(),
+                Value<String?> etymology = const Value.absent(),
+                Value<String?> firstKnownUse = const Value.absent(),
+                Value<String?> simpleMeaning = const Value.absent(),
+                Value<String?> contextualMeaning = const Value.absent(),
               }) => WordsCompanion(
                 id: id,
                 word: word,
-                pronunciation: pronunciation,
-                cefr: cefr,
+                phonetic: phonetic,
                 partOfSpeech: partOfSpeech,
+                syllables: syllables,
+                cefr: cefr,
+                etymology: etymology,
+                firstKnownUse: firstKnownUse,
+                simpleMeaning: simpleMeaning,
+                contextualMeaning: contextualMeaning,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required String word,
-                Value<String?> pronunciation = const Value.absent(),
-                Value<String?> cefr = const Value.absent(),
+                Value<String?> phonetic = const Value.absent(),
                 Value<String?> partOfSpeech = const Value.absent(),
+                Value<String?> syllables = const Value.absent(),
+                Value<String?> cefr = const Value.absent(),
+                Value<String?> etymology = const Value.absent(),
+                Value<String?> firstKnownUse = const Value.absent(),
+                Value<String?> simpleMeaning = const Value.absent(),
+                Value<String?> contextualMeaning = const Value.absent(),
               }) => WordsCompanion.insert(
                 id: id,
                 word: word,
-                pronunciation: pronunciation,
-                cefr: cefr,
+                phonetic: phonetic,
                 partOfSpeech: partOfSpeech,
+                syllables: syllables,
+                cefr: cefr,
+                etymology: etymology,
+                firstKnownUse: firstKnownUse,
+                simpleMeaning: simpleMeaning,
+                contextualMeaning: contextualMeaning,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -3124,15 +3608,17 @@ typedef $$DefinitionsTableCreateCompanionBuilder =
     DefinitionsCompanion Function({
       Value<int> id,
       required int wordId,
-      required String meaning,
-      Value<String?> simpleEnglish,
+      Value<String?> senseNumber,
+      required String definition,
+      Value<String?> labels,
     });
 typedef $$DefinitionsTableUpdateCompanionBuilder =
     DefinitionsCompanion Function({
       Value<int> id,
       Value<int> wordId,
-      Value<String> meaning,
-      Value<String?> simpleEnglish,
+      Value<String?> senseNumber,
+      Value<String> definition,
+      Value<String?> labels,
     });
 
 final class $$DefinitionsTableReferences
@@ -3190,13 +3676,18 @@ class $$DefinitionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get meaning => $composableBuilder(
-    column: $table.meaning,
+  ColumnFilters<String> get senseNumber => $composableBuilder(
+    column: $table.senseNumber,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get simpleEnglish => $composableBuilder(
-    column: $table.simpleEnglish,
+  ColumnFilters<String> get definition => $composableBuilder(
+    column: $table.definition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get labels => $composableBuilder(
+    column: $table.labels,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3263,13 +3754,18 @@ class $$DefinitionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get meaning => $composableBuilder(
-    column: $table.meaning,
+  ColumnOrderings<String> get senseNumber => $composableBuilder(
+    column: $table.senseNumber,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get simpleEnglish => $composableBuilder(
-    column: $table.simpleEnglish,
+  ColumnOrderings<String> get definition => $composableBuilder(
+    column: $table.definition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get labels => $composableBuilder(
+    column: $table.labels,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3309,13 +3805,18 @@ class $$DefinitionsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get meaning =>
-      $composableBuilder(column: $table.meaning, builder: (column) => column);
-
-  GeneratedColumn<String> get simpleEnglish => $composableBuilder(
-    column: $table.simpleEnglish,
+  GeneratedColumn<String> get senseNumber => $composableBuilder(
+    column: $table.senseNumber,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get definition => $composableBuilder(
+    column: $table.definition,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get labels =>
+      $composableBuilder(column: $table.labels, builder: (column) => column);
 
   $$WordsTableAnnotationComposer get wordId {
     final $$WordsTableAnnotationComposer composer = $composerBuilder(
@@ -3396,25 +3897,29 @@ class $$DefinitionsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> wordId = const Value.absent(),
-                Value<String> meaning = const Value.absent(),
-                Value<String?> simpleEnglish = const Value.absent(),
+                Value<String?> senseNumber = const Value.absent(),
+                Value<String> definition = const Value.absent(),
+                Value<String?> labels = const Value.absent(),
               }) => DefinitionsCompanion(
                 id: id,
                 wordId: wordId,
-                meaning: meaning,
-                simpleEnglish: simpleEnglish,
+                senseNumber: senseNumber,
+                definition: definition,
+                labels: labels,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required int wordId,
-                required String meaning,
-                Value<String?> simpleEnglish = const Value.absent(),
+                Value<String?> senseNumber = const Value.absent(),
+                required String definition,
+                Value<String?> labels = const Value.absent(),
               }) => DefinitionsCompanion.insert(
                 id: id,
                 wordId: wordId,
-                meaning: meaning,
-                simpleEnglish: simpleEnglish,
+                senseNumber: senseNumber,
+                definition: definition,
+                labels: labels,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -3506,12 +4011,12 @@ typedef $$DefinitionsTableProcessedTableManager =
 typedef $$ExamplesTableCreateCompanionBuilder = ExamplesCompanion Function({
   Value<int> id,
   required int definitionId,
-  required String sentence,
+  required String exampleText,
 });
 typedef $$ExamplesTableUpdateCompanionBuilder = ExamplesCompanion Function({
   Value<int> id,
   Value<int> definitionId,
-  Value<String> sentence,
+  Value<String> exampleText,
 });
 
 final class $$ExamplesTableReferences
@@ -3550,8 +4055,8 @@ class $$ExamplesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get sentence => $composableBuilder(
-    column: $table.sentence,
+  ColumnFilters<String> get exampleText => $composableBuilder(
+    column: $table.exampleText,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3593,8 +4098,8 @@ class $$ExamplesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get sentence => $composableBuilder(
-    column: $table.sentence,
+  ColumnOrderings<String> get exampleText => $composableBuilder(
+    column: $table.exampleText,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3634,8 +4139,10 @@ class $$ExamplesTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get sentence =>
-      $composableBuilder(column: $table.sentence, builder: (column) => column);
+  GeneratedColumn<String> get exampleText => $composableBuilder(
+    column: $table.exampleText,
+    builder: (column) => column,
+  );
 
   $$DefinitionsTableAnnotationComposer get definitionId {
     final $$DefinitionsTableAnnotationComposer composer = $composerBuilder(
@@ -3691,21 +4198,21 @@ class $$ExamplesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> definitionId = const Value.absent(),
-                Value<String> sentence = const Value.absent(),
+                Value<String> exampleText = const Value.absent(),
               }) => ExamplesCompanion(
                 id: id,
                 definitionId: definitionId,
-                sentence: sentence,
+                exampleText: exampleText,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required int definitionId,
-                required String sentence,
+                required String exampleText,
               }) => ExamplesCompanion.insert(
                 id: id,
                 definitionId: definitionId,
-                sentence: sentence,
+                exampleText: exampleText,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -4259,6 +4766,7 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       Value<String?> description,
       Value<String> colorHex,
       Value<String?> iconName,
+      Value<String?> tags,
       Value<bool> isSmart,
       Value<String?> smartType,
       required DateTime createdAt,
@@ -4270,6 +4778,7 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<String> colorHex,
       Value<String?> iconName,
+      Value<String?> tags,
       Value<bool> isSmart,
       Value<String?> smartType,
       Value<DateTime> createdAt,
@@ -4331,6 +4840,11 @@ class $$CollectionsTableFilterComposer
 
   ColumnFilters<String> get iconName => $composableBuilder(
     column: $table.iconName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4409,6 +4923,11 @@ class $$CollectionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isSmart => $composableBuilder(
     column: $table.isSmart,
     builder: (column) => ColumnOrderings(column),
@@ -4450,6 +4969,9 @@ class $$CollectionsTableAnnotationComposer
 
   GeneratedColumn<String> get iconName =>
       $composableBuilder(column: $table.iconName, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
 
   GeneratedColumn<bool> get isSmart =>
       $composableBuilder(column: $table.isSmart, builder: (column) => column);
@@ -4519,6 +5041,7 @@ class $$CollectionsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> colorHex = const Value.absent(),
                 Value<String?> iconName = const Value.absent(),
+                Value<String?> tags = const Value.absent(),
                 Value<bool> isSmart = const Value.absent(),
                 Value<String?> smartType = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -4528,6 +5051,7 @@ class $$CollectionsTableTableManager
                 description: description,
                 colorHex: colorHex,
                 iconName: iconName,
+                tags: tags,
                 isSmart: isSmart,
                 smartType: smartType,
                 createdAt: createdAt,
@@ -4539,6 +5063,7 @@ class $$CollectionsTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String> colorHex = const Value.absent(),
                 Value<String?> iconName = const Value.absent(),
+                Value<String?> tags = const Value.absent(),
                 Value<bool> isSmart = const Value.absent(),
                 Value<String?> smartType = const Value.absent(),
                 required DateTime createdAt,
@@ -4548,6 +5073,7 @@ class $$CollectionsTableTableManager
                 description: description,
                 colorHex: colorHex,
                 iconName: iconName,
+                tags: tags,
                 isSmart: isSmart,
                 smartType: smartType,
                 createdAt: createdAt,

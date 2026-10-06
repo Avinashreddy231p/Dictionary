@@ -79,6 +79,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final isEditing = collectionToEdit != null;
     final titleController = TextEditingController(text: collectionToEdit?.title ?? '');
     final descController = TextEditingController(text: collectionToEdit?.description ?? '');
+    final tagsController = TextEditingController(text: collectionToEdit?.tags ?? '');
     String selectedColor = collectionToEdit?.colorHex ?? '0xFFE5D4FF';
     String selectedIcon = collectionToEdit?.iconName ?? 'book';
 
@@ -215,6 +216,19 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
+                    const SizedBox(height: 12),
+
+                    // Tags Field
+                    TextField(
+                      controller: tagsController,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Tags (comma separated)',
+                        hintText: 'e.g. Exam, IELTS, Classic, Science',
+                        prefixIcon: const Icon(CupertinoIcons.tag_fill, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
                     const SizedBox(height: 20),
 
                     // Icon Selector
@@ -311,6 +325,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                           if (title.isNotEmpty) {
                             Navigator.pop(ctx);
                             final db = ref.read(databaseProvider);
+                            final tags = tagsController.text.trim();
+
                             if (isEditing) {
                               await db.updateCollection(
                                 id: collectionToEdit.id,
@@ -318,6 +334,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                                 description: descController.text.trim(),
                                 colorHex: selectedColor,
                                 iconName: selectedIcon,
+                                tags: tags.isNotEmpty ? tags : null,
                               );
                             } else {
                               await db.createCollection(
@@ -325,6 +342,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                                 description: descController.text.trim(),
                                 colorHex: selectedColor,
                                 iconName: selectedIcon,
+                                tags: tags.isNotEmpty ? tags : null,
                               );
                             }
                           }
@@ -431,7 +449,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   child: Icon(CupertinoIcons.pencil, color: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary, size: 20),
                 ),
                 title: const Text('Edit Collection', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Change name, description, icon or accent color', style: TextStyle(fontSize: 12)),
+                subtitle: const Text('Change name, description, tags, icon or color', style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _showCollectionBottomSheet(context, collectionToEdit: collection);
@@ -499,7 +517,25 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final reviewWords = ref.watch(needsReviewStreamProvider).value ?? [];
     final favoriteWords = ref.watch(favoritesStreamProvider).value ?? [];
     final bookWords = ref.watch(wordsWithSourceStreamProvider).value ?? [];
+    final masteredWords = ref.watch(masteredWordsStreamProvider).value ?? [];
+    final notesWords = ref.watch(wordsWithNotesStreamProvider).value ?? [];
     final userCollectionsAsync = ref.watch(userCollectionsStreamProvider);
+
+    final userCollections = userCollectionsAsync.value ?? [];
+
+    // Dynamically extract all unique tags from user collections
+    final allExtractedTags = <String>{};
+    for (final col in userCollections) {
+      if (col.tags != null && col.tags!.isNotEmpty) {
+        final split = col.tags!.split(',');
+        for (final t in split) {
+          final clean = t.trim();
+          if (clean.isNotEmpty) {
+            allExtractedTags.add(clean);
+          }
+        }
+      }
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -507,89 +543,130 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
+            // 1. Top Section: Header + Smart Collections Row
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(context),
                     const SizedBox(height: 24),
-                    _buildSearchBar(context),
+                    _buildSmartCollectionsHeader(context),
                     const SizedBox(height: 16),
-                    _buildFilterChips(context),
-                    if (_selectedFilter == 'All' || _selectedFilter == 'Smart') ...[
-                      const SizedBox(height: 32),
-                      _buildSmartCollectionsHeader(context),
-                      const SizedBox(height: 16),
-                      _buildSmartCollectionsGrid(
-                        context,
-                        recentCount: recentWords.length,
-                        reviewCount: reviewWords.length,
-                        favoritesCount: favoriteWords.length,
-                        bookCount: bookWords.length,
-                      ),
-                    ],
-                    if (_selectedFilter == 'All' || _selectedFilter == 'Custom' || _selectedFilter == 'Books') ...[
-                      const SizedBox(height: 32),
-                      _buildMyCollectionsHeader(context),
-                      const SizedBox(height: 16),
-                    ],
+                    _buildSmartCollectionsRow(
+                      context,
+                      filter: _selectedFilter,
+                      recentCount: recentWords.length,
+                      reviewCount: reviewWords.length,
+                      favoritesCount: favoriteWords.length,
+                      bookCount: bookWords.length,
+                      masteredCount: masteredWords.length,
+                      notesCount: notesWords.length,
+                    ),
                   ],
                 ),
               ),
             ),
-            if (_selectedFilter == 'All' || _selectedFilter == 'Custom' || _selectedFilter == 'Books')
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: userCollectionsAsync.when(
-                  data: (cols) {
-                    final filteredCols = cols.where((c) {
-                      if (_searchQuery.isNotEmpty && !c.title.toLowerCase().contains(_searchQuery)) {
-                        return false;
-                      }
-                      return true;
-                    }).toList();
 
-                    if (filteredCols.isEmpty) {
-                      return SliverToBoxAdapter(
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: theme.cardTheme.color,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: AppColors.cardBorder(context)),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'No collections match "$_searchQuery"'
-                                  : 'No custom collections yet. Create your first one!',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: isDark ? Colors.white70 : AppColors.textSecondary,
-                                  ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final col = filteredCols[index];
-                          return _buildCollectionCard(context, col);
-                        },
-                        childCount: filteredCols.length,
-                      ),
-                    );
-                  },
-                  loading: () => const SliverToBoxAdapter(
-                    child: Center(child: CircularProgressIndicator()),
+            // 2. Sticky Search Bar + Filter Chips Row (Pins at top on scroll!)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _StickySearchBarDelegate(
+                height: 126.0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSearchBar(context),
+                      const SizedBox(height: 10),
+                      _buildFilterChips(context, extractedTags: allExtractedTags.toList()),
+                    ],
                   ),
-                  error: (err, _) => SliverToBoxAdapter(child: Text('Error: $err')),
                 ),
               ),
+            ),
+
+            // 3. My Collections Header
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+              sliver: SliverToBoxAdapter(
+                child: _buildMyCollectionsHeader(context),
+              ),
+            ),
+
+            // 4. Custom Collections List
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              sliver: userCollectionsAsync.when(
+                data: (cols) {
+                  final filteredCols = cols.where((c) {
+                    // Search Query filter
+                    if (_searchQuery.isNotEmpty && !c.title.toLowerCase().contains(_searchQuery) && !(c.description?.toLowerCase().contains(_searchQuery) ?? false)) {
+                      return false;
+                    }
+                    // Filter Pill selection
+                    if (_selectedFilter == 'All' || _selectedFilter == 'Custom') {
+                      return true;
+                    }
+                    if (_selectedFilter == 'Books') {
+                      final t = '${c.title} ${c.description ?? ''} ${c.tags ?? ''}'.toLowerCase();
+                      return t.contains('book') || t.contains('gatsby') || t.contains('potter') || t.contains('novel') || t.contains('chapter') || t.contains('read');
+                    }
+                    if (_selectedFilter == 'Recent' || _selectedFilter == 'Favorites' || _selectedFilter == 'Review') {
+                      return true;
+                    }
+                    // Check if selected filter matches one of the custom tags!
+                    if (c.tags != null && c.tags!.isNotEmpty) {
+                      final colTags = c.tags!.split(',').map((t) => t.trim().toLowerCase()).toList();
+                      if (colTags.contains(_selectedFilter.toLowerCase())) {
+                        return true;
+                      }
+                    }
+                    return false;
+                  }).toList();
+
+                  if (filteredCols.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: theme.cardTheme.color,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.cardBorder(context)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _searchQuery.isNotEmpty
+                                ? 'No collections match "$_searchQuery"'
+                                : 'No custom collections match "$_selectedFilter"',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                                ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final col = filteredCols[index];
+                        return _buildCollectionCard(context, col);
+                      },
+                      childCount: filteredCols.length,
+                    ),
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, _) => SliverToBoxAdapter(child: Text('Error: $err')),
+              ),
+            ),
             const SliverToBoxAdapter(
               child: SizedBox(height: 32),
             )
@@ -605,32 +682,46 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'My Collections',
-                softWrap: true,
-                style: theme.textTheme.displayMedium?.copyWith(
-                      height: 1.1,
-                    ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'My Collections',
+                  maxLines: 1,
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Your saved vocabulary organized.',
-                softWrap: true,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                    ),
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(width: 12),
-        Icon(CupertinoIcons.sparkles, color: theme.primaryColor, size: 32),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: theme.primaryColor.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(CupertinoIcons.sparkles, color: theme.primaryColor, size: 24),
+        ),
       ],
     );
   }
@@ -646,7 +737,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         });
       },
       decoration: InputDecoration(
-        hintText: 'Search your collections...',
+        hintText: 'Search your collections or tags...',
         prefixIcon: Icon(CupertinoIcons.search, color: isDark ? Colors.white60 : AppColors.textSecondary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(50),
@@ -664,20 +755,45 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildFilterChips(BuildContext context) {
+  Widget _buildFilterChips(BuildContext context, {required List<String> extractedTags}) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final filters = ['All', 'Smart', 'Custom', 'Books'];
+
+    final defaultFilters = [
+      'All',
+      'Books',
+      'Recent',
+      'Favorites',
+      'Review',
+      'Mastered',
+      'Notes',
+    ];
+
+    final combinedFilters = <String>[...defaultFilters];
+    for (final tag in extractedTags) {
+      if (!combinedFilters.any((f) => f.toLowerCase() == tag.toLowerCase())) {
+        combinedFilters.add(tag);
+      }
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
       child: Row(
-        children: filters.map((filter) {
-          final isSelected = _selectedFilter == filter;
+        children: combinedFilters.map((filter) {
+          final isSelected = _selectedFilter.toLowerCase() == filter.toLowerCase();
+          final isCustomTag = !defaultFilters.contains(filter);
+
           return Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 10),
             child: ChoiceChip(
+              avatar: isCustomTag
+                  ? Icon(
+                      CupertinoIcons.tag_fill,
+                      size: 14,
+                      color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                    )
+                  : null,
               label: Text(filter),
               selected: isSelected,
               onSelected: (bool selected) {
@@ -696,13 +812,13 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                   ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
                 side: BorderSide(
                   color: isSelected ? theme.primaryColor : AppColors.cardBorder(context),
                   width: 1.5,
                 ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               showCheckmark: false,
             ),
           );
@@ -731,39 +847,28 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Widget _buildSmartCollectionsGrid(
+  Widget _buildSmartCollectionsRow(
     BuildContext context, {
+    required String filter,
     required int recentCount,
     required int reviewCount,
     required int favoritesCount,
     required int bookCount,
+    required int masteredCount,
+    required int notesCount,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
 
-    // Dynamically adjust childAspectRatio to allow extra vertical room for large fonts
-    double aspectRatio = 1.25;
-    if (textScale > 1.8) {
-      aspectRatio = 0.8;
-    } else if (textScale > 1.4) {
-      aspectRatio = 0.95;
-    } else if (textScale > 1.15) {
-      aspectRatio = 1.1;
-    }
+    final cards = <Widget>[];
+    final fLower = filter.toLowerCase();
 
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: aspectRatio,
-      children: [
+    if (fLower == 'all' || fLower == 'recent') {
+      cards.add(
         _buildSmartCard(
           context,
           title: 'Recently Saved',
           subtitle: '$recentCount words',
-          icon: CupertinoIcons.time,
+          icon: CupertinoIcons.time_solid,
           color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
           textColor: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
           onTap: () {
@@ -779,6 +884,11 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             );
           },
         ),
+      );
+    }
+
+    if (fLower == 'all' || fLower == 'review') {
+      cards.add(
         _buildSmartCard(
           context,
           title: 'Needs Review',
@@ -799,11 +909,16 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             );
           },
         ),
+      );
+    }
+
+    if (fLower == 'all' || fLower == 'favorites') {
+      cards.add(
         _buildSmartCard(
           context,
           title: 'Favorites',
           subtitle: '$favoritesCount words',
-          icon: CupertinoIcons.star,
+          icon: CupertinoIcons.star_fill,
           color: isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
           textColor: isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
           onTap: () {
@@ -819,11 +934,16 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             );
           },
         ),
+      );
+    }
+
+    if (fLower == 'all' || fLower == 'books') {
+      cards.add(
         _buildSmartCard(
           context,
           title: 'From Books',
           subtitle: '$bookCount words',
-          icon: CupertinoIcons.book,
+          icon: CupertinoIcons.book_fill,
           color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
           textColor: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
           onTap: () {
@@ -839,7 +959,70 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             );
           },
         ),
-      ],
+      );
+    }
+
+    if (fLower == 'all' || fLower == 'mastered') {
+      cards.add(
+        _buildSmartCard(
+          context,
+          title: 'Mastered',
+          subtitle: '$masteredCount words',
+          icon: CupertinoIcons.checkmark_seal_fill,
+          color: isDark ? AppColors.darkSoftPink : AppColors.softPeach,
+          textColor: isDark ? AppColors.darkSoftPinkText : AppColors.textPrimary,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CollectionDetailScreen(
+                  title: 'Mastered',
+                  description: 'Words you have fully mastered and known',
+                  smartType: 'mastered',
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (fLower == 'all' || fLower == 'notes') {
+      cards.add(
+        _buildSmartCard(
+          context,
+          title: 'With Notes',
+          subtitle: '$notesCount words',
+          icon: CupertinoIcons.doc_text_fill,
+          color: isDark ? const Color(0xFF1E3A40) : const Color(0xFFE0F2F1),
+          textColor: isDark ? const Color(0xFF80CBC4) : const Color(0xFF004D40),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CollectionDetailScreen(
+                  title: 'With Notes',
+                  description: 'Words with personal notes and sentences',
+                  smartType: 'notes',
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (cards.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      height: 175,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        children: cards,
+      ),
     );
   }
 
@@ -855,70 +1038,87 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(24),
-          border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(icon, color: textColor, size: 28),
-            const SizedBox(height: 8),
-            Row(
+    return Container(
+      width: 160,
+      margin: const EdgeInsets.only(right: 14),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(28),
+        border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(28),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                              height: 1.15,
-                              fontWeight: FontWeight.w800,
-                              color: textColor,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                              color: textColor.withOpacity(0.85),
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
+                // Top Icon Badge
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.black38 : Colors.white,
+                    color: isDark ? Colors.black26 : Colors.white.withOpacity(0.7),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    CupertinoIcons.arrow_right,
-                    size: 14,
-                    color: textColor,
-                  ),
+                  child: Icon(icon, color: textColor, size: 22),
+                ),
+
+                // Title & Subtitle + Arrow Button
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                            height: 1.15,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: textColor.withOpacity(0.85),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                        ),
+                        Container(
+                          width: 26,
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.black38 : Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            CupertinoIcons.arrow_right,
+                            size: 13,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -960,6 +1160,10 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final accentColor = _parseColor(collection.colorHex, isDark);
     final iconData = _getIconData(collection.iconName);
     final wordsAsync = ref.watch(collectionWordsStreamProvider(collection.id));
+
+    final tagList = (collection.tags != null && collection.tags!.isNotEmpty)
+        ? collection.tags!.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList()
+        : <String>[];
 
     return wordsAsync.when(
       data: (words) {
@@ -1076,6 +1280,39 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       ],
                     ),
 
+                    // Tags Row (if tags present)
+                    if (tagList.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: tagList.map((tag) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: accentColor.withOpacity(isDark ? 0.25 : 0.45),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(CupertinoIcons.tag_fill, size: 10, color: isDark ? Colors.white70 : AppColors.textPrimary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
                     // Progress Stats Breakdown
                     const SizedBox(height: 16),
                     Row(
@@ -1161,5 +1398,34 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         ),
       ],
     );
+  }
+}
+
+class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _StickySearchBarDelegate({required this.child, this.height = 126.0});
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final theme = Theme.of(context);
+    return Container(
+      height: height,
+      color: theme.scaffoldBackgroundColor,
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  bool shouldRebuild(covariant _StickySearchBarDelegate oldDelegate) {
+    return oldDelegate.child != child || oldDelegate.height != height;
   }
 }

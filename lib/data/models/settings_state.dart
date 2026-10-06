@@ -12,6 +12,10 @@ class SettingsState {
   final String reminderTime; // e.g. "08:00 PM"
   final bool streakProtection;
   final bool offlineDatabaseEnabled;
+  final bool hapticFeedbackEnabled;
+  final bool soundEffectsEnabled;
+  final bool wordOfTheDayNotification;
+  final String wordOfTheDayTime; // e.g. "09:00 AM"
 
   const SettingsState({
     this.themeMode = ThemeMode.system,
@@ -25,6 +29,10 @@ class SettingsState {
     this.reminderTime = '08:00 PM',
     this.streakProtection = true,
     this.offlineDatabaseEnabled = true,
+    this.hapticFeedbackEnabled = true,
+    this.soundEffectsEnabled = true,
+    this.wordOfTheDayNotification = true,
+    this.wordOfTheDayTime = '09:00 AM',
   });
 
   SettingsState copyWith({
@@ -39,6 +47,10 @@ class SettingsState {
     String? reminderTime,
     bool? streakProtection,
     bool? offlineDatabaseEnabled,
+    bool? hapticFeedbackEnabled,
+    bool? soundEffectsEnabled,
+    bool? wordOfTheDayNotification,
+    String? wordOfTheDayTime,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
@@ -53,6 +65,12 @@ class SettingsState {
       streakProtection: streakProtection ?? this.streakProtection,
       offlineDatabaseEnabled:
           offlineDatabaseEnabled ?? this.offlineDatabaseEnabled,
+      hapticFeedbackEnabled:
+          hapticFeedbackEnabled ?? this.hapticFeedbackEnabled,
+      soundEffectsEnabled: soundEffectsEnabled ?? this.soundEffectsEnabled,
+      wordOfTheDayNotification:
+          wordOfTheDayNotification ?? this.wordOfTheDayNotification,
+      wordOfTheDayTime: wordOfTheDayTime ?? this.wordOfTheDayTime,
     );
   }
 }

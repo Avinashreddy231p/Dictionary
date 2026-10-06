@@ -6,25 +6,33 @@ import 'package:path/path.dart' as p;
 
 part 'database.g.dart';
 
+// --- Drift Database Tables ---
+
 class Words extends Table {
   IntColumn get id => integer().autoIncrement()();
-  TextColumn get word => text()();
-  TextColumn get pronunciation => text().nullable()();
-  TextColumn get cefr => text().nullable()();
+  TextColumn get word => text().unique()();
+  TextColumn get phonetic => text().nullable()();
   TextColumn get partOfSpeech => text().nullable()();
+  TextColumn get syllables => text().nullable()();
+  TextColumn get cefr => text().nullable()();
+  TextColumn get etymology => text().nullable()();
+  TextColumn get firstKnownUse => text().nullable()();
+  TextColumn get simpleMeaning => text().nullable()();
+  TextColumn get contextualMeaning => text().nullable()();
 }
 
 class Definitions extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get wordId => integer().references(Words, #id)();
-  TextColumn get meaning => text()();
-  TextColumn get simpleEnglish => text().nullable()();
+  IntColumn get wordId => integer().references(Words, #id, onDelete: KeyAction.cascade)();
+  TextColumn get senseNumber => text().nullable()();
+  TextColumn get definition => text()();
+  TextColumn get labels => text().nullable()(); // comma separated e.g. "archaic, formal"
 }
 
 class Examples extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get definitionId => integer().references(Definitions, #id)();
-  TextColumn get sentence => text()();
+  IntColumn get definitionId => integer().references(Definitions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get exampleText => text()();
 }
 
 class SavedWords extends Table {
@@ -50,6 +58,7 @@ class Collections extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get colorHex => text().withDefault(const Constant('0xFFE5D4FF'))();
   TextColumn get iconName => text().nullable()();
+  TextColumn get tags => text().nullable()(); // Comma-separated tags e.g. "IELTS, Exam"
   BoolColumn get isSmart => boolean().withDefault(const Constant(false))();
   TextColumn get smartType => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
@@ -75,35 +84,34 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2; // Incremented to trigger migration
+  int get schemaVersion => 3;
 
   @override
-  MigrationStrategy get migration {
-    return MigrationStrategy(
-      onCreate: (Migrator m) async {
-        await m.createAll();
-      },
-      onUpgrade: (Migrator m, int from, int to) async {
-        if (from < 2) {
-          // If you add new tables, uncomment these
-          // await m.createTable(collections);
-          // await m.createTable(collectionWords);
-          // await m.createTable(recentSearches);
-        }
-      },
-      beforeOpen: (details) async {
-        // Optional: Enable foreign keys if you use them heavily
-        await customStatement('PRAGMA foreign_keys = ON');
-      },
-    );
-  }
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 3) {
+        await m.addColumn(collections, collections.tags);
+      }
+    },
+  );
 
   // --- Saved Words Queries & Streams ---
   Stream<List<SavedWord>> watchAllSavedWords() {
     return (select(savedWords)..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
   }
 
-  Stream<List<SavedWord>> watchRecentSavedWords({int limit = 20}) {
+  Stream<List<SavedWord>> watchTodaySavedWords() {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    return (select(savedWords)
+      ..where((t) => t.dateAdded.isBiggerOrEqualValue(startOfDay))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchRecentSavedWords({int limit = 10}) {
     return (select(savedWords)
       ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])
       ..limit(limit)).watch();
@@ -124,6 +132,18 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<SavedWord>> watchWordsWithSource() {
     return (select(savedWords)
       ..where((t) => t.source.isNotNull() & t.source.isNotValue(''))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchMasteredWords() {
+    return (select(savedWords)
+      ..where((t) => t.reviewState.equals(2))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchWordsWithNotes() {
+    return (select(savedWords)
+      ..where((t) => (t.contextSentence.isNotNull() & t.contextSentence.isNotValue('')) | (t.personalNote.isNotNull() & t.personalNote.isNotValue('')))
       ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
   }
 
@@ -220,12 +240,14 @@ class AppDatabase extends _$AppDatabase {
     String? description,
     String? colorHex,
     String? iconName,
+    String? tags,
   }) async {
     return into(collections).insert(CollectionsCompanion.insert(
       title: title,
       description: Value(description),
       colorHex: Value(colorHex ?? '0xFFE5D4FF'),
       iconName: Value(iconName ?? 'book'),
+      tags: Value(tags),
       createdAt: DateTime.now(),
     ));
   }
@@ -236,6 +258,7 @@ class AppDatabase extends _$AppDatabase {
     String? description,
     String? colorHex,
     String? iconName,
+    String? tags,
   }) async {
     await (update(collections)..where((t) => t.id.equals(id))).write(
       CollectionsCompanion(
@@ -243,6 +266,7 @@ class AppDatabase extends _$AppDatabase {
         description: Value(description),
         colorHex: Value(colorHex ?? '0xFFE5D4FF'),
         iconName: Value(iconName ?? 'book'),
+        tags: Value(tags),
       ),
     );
   }
@@ -296,21 +320,29 @@ class AppDatabase extends _$AppDatabase {
         title: 'The Great Gatsby',
         description: 'Key vocabulary encountered while reading Chapter 3',
         colorHex: '0xFFE5D4FF',
+        iconName: 'book',
+        tags: 'Book, Fiction, Classic',
       );
       final forgetColId = await createCollection(
         title: 'Words I Keep Forgetting',
         description: 'Tricky advanced terms needing extra repetition',
         colorHex: '0xFFD4F5E9',
+        iconName: 'star',
+        tags: 'Tricky, Review, Important',
       );
       final ieltsColId = await createCollection(
         title: 'IELTS Vocabulary',
         description: 'Band 8+ academic words for speaking and writing',
         colorHex: '0xFFFFE2D4',
+        iconName: 'flag',
+        tags: 'Exam, IELTS, Academic',
       );
       final hpColId = await createCollection(
         title: 'Harry Potter',
         description: 'Magical and literary descriptions',
         colorHex: '0xFFD4E3FF',
+        iconName: 'sparkles',
+        tags: 'Book, Magic, Literature',
       );
 
       // Seed Saved Words
@@ -367,34 +399,34 @@ class AppDatabase extends _$AppDatabase {
         source: 'IELTS Vocabulary',
         contextSentence: 'Her serene expression reassured everyone in the crowded room.',
         reviewState: 2,
-        isFavorite: true,
-      );
-
-      final w5 = await saveWord(
-        word: 'peculiar',
-        phonetic: '/ pɪˈkjuːliər /',
-        partOfSpeech: 'adjective',
-        meaning: 'Strange or odd; unusual.',
-        example: 'He gave her a peculiar look before leaving.',
-        syllables: 'pe*cu*li*ar',
-        cefr: 'B2',
-        source: 'Harry Potter',
-        contextSentence: 'There was a peculiar scratching sound coming from the cupboard.',
-        reviewState: 0,
         isFavorite: false,
       );
 
-      final w6 = await saveWord(
-        word: 'ambiguous',
-        phonetic: '/ æmˈbɪɡjuəs /',
+      final w5 = await saveWord(
+        word: 'quintessential',
+        phonetic: '/ ˌkwɪntɪˈsɛnʃəl /',
         partOfSpeech: 'adjective',
-        meaning: 'Open to more than one interpretation; not clear.',
-        example: 'The ending of the novel was intentionally ambiguous.',
-        syllables: 'am*big*u*ous',
+        meaning: 'Representing the most perfect or typical example of a quality or class.',
+        example: 'He was the quintessential tough guy.',
+        syllables: 'quin*tes*sen*tial',
+        cefr: 'C2',
+        source: 'Harry Potter',
+        contextSentence: 'It was a quintessential autumn day with crisp crisp air.',
+        reviewState: 1,
+        isFavorite: true,
+      );
+
+      final w6 = await saveWord(
+        word: 'resilient',
+        phonetic: '/ rɪˈzɪliənt /',
+        partOfSpeech: 'adjective',
+        meaning: 'Able to withstand or recover quickly from difficult conditions.',
+        example: 'Babies are surprisingly resilient.',
+        syllables: 're*sil*i*ent',
         cefr: 'B2',
         source: 'IELTS Vocabulary',
-        contextSentence: 'His response was ambiguous, leaving us uncertain about his decision.',
-        reviewState: 1,
+        contextSentence: 'The community remained resilient after the storm.',
+        reviewState: 2,
         isFavorite: false,
       );
 
@@ -403,14 +435,8 @@ class AppDatabase extends _$AppDatabase {
       await addWordToCollection(gatsbyColId, w2);
       await addWordToCollection(forgetColId, w3);
       await addWordToCollection(ieltsColId, w4);
-      await addWordToCollection(ieltsColId, w6);
       await addWordToCollection(hpColId, w5);
-
-      // Seed Recent Searches
-      await addRecentSearch('reluctant');
-      await addRecentSearch('peculiar');
-      await addRecentSearch('ambiguous');
-      await addRecentSearch('serene');
+      await addWordToCollection(ieltsColId, w6);
     }
   }
 }
@@ -418,7 +444,7 @@ class AppDatabase extends _$AppDatabase {
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'lexi_lens.sqlite'));
+    final file = File(p.join(dbFolder.path, 'dictionary_v2.sqlite'));
     return NativeDatabase.createInBackground(file);
   });
 }

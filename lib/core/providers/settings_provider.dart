@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/database/database.dart';
 import '../../data/models/settings_state.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -24,6 +26,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keyReminderTime = 'settings_reminder_time';
   static const _keyStreakProtection = 'settings_streak_protection';
   static const _keyOfflineDatabase = 'settings_offline_database';
+  static const _keyHapticFeedback = 'settings_haptic_feedback';
+  static const _keySoundEffects = 'settings_sound_effects';
+  static const _keyWotdNotification = 'settings_wotd_notification';
+  static const _keyWotdTime = 'settings_wotd_time';
 
   @override
   SettingsState build() {
@@ -49,6 +55,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final reminderTime = _prefs.getString(_keyReminderTime) ?? '08:00 PM';
     final streakProtection = _prefs.getBool(_keyStreakProtection) ?? true;
     final offlineDatabaseEnabled = _prefs.getBool(_keyOfflineDatabase) ?? true;
+    final hapticFeedbackEnabled = _prefs.getBool(_keyHapticFeedback) ?? true;
+    final soundEffectsEnabled = _prefs.getBool(_keySoundEffects) ?? true;
+    final wordOfTheDayNotification = _prefs.getBool(_keyWotdNotification) ?? true;
+    final wordOfTheDayTime = _prefs.getString(_keyWotdTime) ?? '09:00 AM';
 
     return SettingsState(
       themeMode: themeMode,
@@ -62,6 +72,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       reminderTime: reminderTime,
       streakProtection: streakProtection,
       offlineDatabaseEnabled: offlineDatabaseEnabled,
+      hapticFeedbackEnabled: hapticFeedbackEnabled,
+      soundEffectsEnabled: soundEffectsEnabled,
+      wordOfTheDayNotification: wordOfTheDayNotification,
+      wordOfTheDayTime: wordOfTheDayTime,
     );
   }
 
@@ -120,6 +134,51 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.setBool(_keyOfflineDatabase, enabled);
   }
 
+  Future<void> setHapticFeedback(bool enabled) async {
+    state = state.copyWith(hapticFeedbackEnabled: enabled);
+    await _prefs.setBool(_keyHapticFeedback, enabled);
+  }
+
+  Future<void> setSoundEffects(bool enabled) async {
+    state = state.copyWith(soundEffectsEnabled: enabled);
+    await _prefs.setBool(_keySoundEffects, enabled);
+  }
+
+  Future<void> setWordOfTheDayNotification(bool enabled) async {
+    state = state.copyWith(wordOfTheDayNotification: enabled);
+    await _prefs.setBool(_keyWotdNotification, enabled);
+  }
+
+  Future<void> setWordOfTheDayTime(String time) async {
+    state = state.copyWith(wordOfTheDayTime: time);
+    await _prefs.setString(_keyWotdTime, time);
+  }
+
+  Future<int> importVocabularyJson(String jsonString, AppDatabase db) async {
+    try {
+      final List<dynamic> list = jsonDecode(jsonString);
+      int importedCount = 0;
+
+      for (final item in list) {
+        if (item is Map<String, dynamic> && item.containsKey('word')) {
+          final word = item['word'] as String;
+          await db.saveWord(
+            word: word,
+            phonetic: item['phonetic'] as String?,
+            partOfSpeech: item['partOfSpeech'] as String?,
+            meaning: item['meaning'] as String?,
+            example: item['example'] as String?,
+            cefr: item['cefr'] as String? ?? 'B2',
+          );
+          importedCount++;
+        }
+      }
+      return importedCount;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   Future<void> clearCacheAndHistory() async {
     final keys = _prefs.getKeys();
     for (final key in keys) {
@@ -142,5 +201,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.remove(_keyReminderTime);
     await _prefs.remove(_keyStreakProtection);
     await _prefs.remove(_keyOfflineDatabase);
+    await _prefs.remove(_keyHapticFeedback);
+    await _prefs.remove(_keySoundEffects);
+    await _prefs.remove(_keyWotdNotification);
+    await _prefs.remove(_keyWotdTime);
   }
 }

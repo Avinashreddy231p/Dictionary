@@ -1,11 +1,45 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/providers.dart';
 
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
   const MainScaffold({super.key, required this.navigationShell});
+
+  @override
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends ConsumerState<MainScaffold> {
+  DateTime? _lastSearchTap;
+
+  void _handleDestinationSelected(int index) {
+    final currentIndex = widget.navigationShell.currentIndex;
+    final now = DateTime.now();
+
+    if (index == 0) {
+      // Handle tap / double-tap on Search icon in Bottom Nav Bar
+      final isDoubleTap = _lastSearchTap != null &&
+          now.difference(_lastSearchTap!) < const Duration(milliseconds: 600);
+
+      _lastSearchTap = now;
+
+      // Navigate to /home/search route directly
+      context.go('/home/search');
+
+      // Trigger focus and keyboard popup in SearchScreen
+      ref.read(searchFocusTriggerProvider.notifier).trigger();
+      return;
+    }
+
+    widget.navigationShell.goBranch(
+      index,
+      initialLocation: index == currentIndex,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +48,7 @@ class MainScaffold extends StatelessWidget {
     final primaryColor = theme.primaryColor;
 
     return Scaffold(
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           indicatorColor: isDark
@@ -36,13 +70,8 @@ class MainScaffold extends StatelessWidget {
           }),
         ),
         child: NavigationBar(
-          selectedIndex: navigationShell.currentIndex,
-          onDestinationSelected: (index) {
-            navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
-            );
-          },
+          selectedIndex: widget.navigationShell.currentIndex,
+          onDestinationSelected: _handleDestinationSelected,
           backgroundColor: theme.scaffoldBackgroundColor,
           elevation: 0,
           destinations: [

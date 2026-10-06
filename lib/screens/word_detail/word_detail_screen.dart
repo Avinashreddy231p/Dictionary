@@ -478,11 +478,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  Color _getHeaderBlobColor(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow;
-  }
-
   @override
   Widget build(BuildContext context) {
     if (widget.entry == null) {
@@ -495,9 +490,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final theme = Theme.of(context);
 
     final word = entry.core.headword;
-    final phonetic = entry.core.phonetic;
-    final pos = entry.core.partOfSpeech;
-
     final isSavedAsync = ref.watch(isWordSavedStreamProvider(word.toLowerCase()));
     final isSaved = isSavedAsync.value ?? false;
 
@@ -506,169 +498,178 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final savedWord = savedWordAsync.value;
 
     final allExamples = entry.senses.expand((s) => s.examples).toList();
-    final topPadding = MediaQuery.of(context).padding.top;
+
+    int cardIndex = 0;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          // 1. ACCENT HEADER BLOB (Starts BELOW top app bar region, so app bar is 100% transparent on cream!)
-          Positioned(
-            top: topPadding + 62, // Positioned right below the top floating icons!
-            left: 0,
-            right: 0,
-            height: 250,
-            child: GestureDetector(
-              onTap: () {
-                _playAudio(entry.core.audioUrl);
-                HapticFeedback.lightImpact();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color: _getHeaderBlobColor(context),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(44),
-                    bottomRight: Radius.circular(44),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _getHeaderBlobColor(context).withOpacity(0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    )
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. FLOATING APP BAR
+            _buildTopBar(context, ref, isSaved),
+
+            // 2. SCROLLABLE CONTENT WITH STAGGERED FLUID ENTRANCE ANIMATIONS
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _buildHeaderAndSimpleMeaning(context, entry),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Mastery Progress Card (if saved)
+                    if (isSaved) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildMasteryCard(context, ref, word),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Context Card
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _buildContextCard(context, word),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (allExamples.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildExampleCard(context, allExamples),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (entry.core.syllables.length > 1) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildAnatomyCard(context),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Personal Reader Notes (if saved)
+                    if (isSaved && savedWord != null) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildPersonalNoteCard(context, savedWord),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Rich Dictionary Data
+                    if (entry.senses.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildFullDefinitionsCard(context, entry.senses),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (_fetchedPairings.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildPairingsCard(context),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (entry.grammar.verbDivision.isNotEmpty ||
+                        entry.grammar.usageNotes.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildUsageGrammarCard(context),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (entry.grammar.inflections.isNotEmpty || entry.grammar.relatedForms.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildWordFamilyCard(context),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Synonyms & Antonyms
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _buildRelationshipsCard(context),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (entry.linguistic.etymology.isNotEmpty) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _buildEtymologyCard(context, entry.linguistic),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Bottom Action
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _buildSavedButton(context, ref, isSaved),
+                    ),
+                    const SizedBox(height: 48),
                   ],
                 ),
               ),
             ),
-          ),
-
-          // 2. SCROLLABLE CONTENT WITH FLOATING TOP BAR
-          SafeArea(
-            child: Column(
-              children: [
-                // Top App Bar Area (Sits on clean cream background, 100% transparent!)
-                _buildTopBar(context, ref, isSaved),
-
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 12),
-                        // Word Header Content (Sits directly inside the Yellow Header Blob below top bar!)
-                        _buildHeaderContent(context, word, phonetic, pos),
-                        const SizedBox(height: 36),
-
-                        // Mastery Progress Card (if saved)
-                        if (isSaved) _buildMasteryCard(context, ref, word),
-                        if (isSaved) const SizedBox(height: 16),
-
-                        // 1. Core Meaning & Context (HIGHLIGHTED WITH SIMPLICITY)
-                        _buildSimpleMeaningCard(context, entry.lexiLens.simpleMeaning),
-                        const SizedBox(height: 16),
-                        _buildContextCard(context, word),
-                        const SizedBox(height: 16),
-                        if (allExamples.isNotEmpty) _buildExampleCard(context, allExamples),
-                        if (allExamples.isNotEmpty) const SizedBox(height: 16),
-                        if (entry.core.syllables.length > 1) _buildAnatomyCard(context),
-                        if (entry.core.syllables.length > 1) const SizedBox(height: 24),
-
-                        // Personal Reader Notes (if saved)
-                        if (isSaved && savedWord != null) ...[
-                          _buildPersonalNoteCard(context, savedWord),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // 2. Rich Dictionary Data
-                        if (entry.senses.isNotEmpty)
-                          _buildFullDefinitionsCard(context, entry.senses),
-                        if (entry.senses.isNotEmpty) const SizedBox(height: 16),
-
-                        if (_fetchedPairings.isNotEmpty) ...[
-                          _buildPairingsCard(context),
-                          const SizedBox(height: 16),
-                        ],
-
-                        if (entry.grammar.verbDivision.isNotEmpty ||
-                            entry.grammar.usageNotes.isNotEmpty)
-                          _buildUsageGrammarCard(context),
-                        if (entry.grammar.verbDivision.isNotEmpty ||
-                            entry.grammar.usageNotes.isNotEmpty)
-                          const SizedBox(height: 16),
-
-                        if (entry.grammar.inflections.isNotEmpty || entry.grammar.relatedForms.isNotEmpty)
-                          _buildWordFamilyCard(context),
-                        if (entry.grammar.inflections.isNotEmpty || entry.grammar.relatedForms.isNotEmpty)
-                          const SizedBox(height: 16),
-
-                        // Synonyms & Antonyms
-                        _buildRelationshipsCard(context),
-                        const SizedBox(height: 16),
-
-                        if (entry.linguistic.etymology.isNotEmpty)
-                          _buildEtymologyCard(context, entry.linguistic),
-                        if (entry.linguistic.etymology.isNotEmpty)
-                          const SizedBox(height: 24),
-
-                        // 3. Bottom Action
-                        _buildSavedButton(context, ref, isSaved),
-                        const SizedBox(height: 48),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  // TRANSPARENT TOP APP BAR WITH FLOATING CIRCULAR BUTTONS
+  // FLOATING APP BAR
   Widget _buildTopBar(BuildContext context, WidgetRef ref, bool isSaved) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildFloatingIconButton(
-            context,
-            icon: CupertinoIcons.back,
-            onPressed: () {
+          _BouncyTouch(
+            onTap: () {
               if (context.canPop()) context.pop();
             },
+            child: _buildFloatingIconButton(
+              context,
+              icon: CupertinoIcons.arrow_left,
+              onPressed: () {
+                if (context.canPop()) context.pop();
+              },
+            ),
           ),
           Row(
             children: [
-              // Recall / Quiz Mode Toggle Button
-              _buildFloatingIconButton(
-                context,
-                icon: _isRecallMode ? CupertinoIcons.eye_fill : CupertinoIcons.eye_slash,
-                iconColor: _isRecallMode ? AppColors.primaryPurple : null,
-                onPressed: () {
-                  setState(() {
-                    _isRecallMode = !_isRecallMode;
-                    _isMeaningRevealed = false;
-                  });
-                  HapticFeedback.selectionClick();
-                },
+              _BouncyTouch(
+                onTap: () => _toggleSaveWord(context, ref),
+                child: _buildFloatingIconButton(
+                  context,
+                  icon: isSaved ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
+                  iconColor: isSaved ? Colors.green : null,
+                  onPressed: () => _toggleSaveWord(context, ref),
+                ),
               ),
               const SizedBox(width: 10),
-              _buildFloatingIconButton(
-                context,
-                icon: isSaved ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
-                iconColor: isSaved ? Colors.green : null,
-                onPressed: () => _toggleSaveWord(context, ref),
-              ),
-              const SizedBox(width: 10),
-              _buildFloatingIconButton(
-                context,
-                icon: CupertinoIcons.share,
-                onPressed: () => _showShareSheet(context),
+              _BouncyTouch(
+                onTap: () => _showShareSheet(context),
+                child: _buildFloatingIconButton(
+                  context,
+                  icon: CupertinoIcons.ellipsis_vertical,
+                  onPressed: () => _showShareSheet(context),
+                ),
               ),
             ],
           )
@@ -677,152 +678,347 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  // Minimalist App Bar Icon Button without white circular background
+  // FLOATING CIRCULAR PILL BUTTON
   Widget _buildFloatingIconButton(BuildContext context,
       {required IconData icon, required VoidCallback onPressed, Color? iconColor}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return IconButton(
-      icon: Icon(
-        icon,
-        color: iconColor ?? (isDark ? Colors.white : AppColors.textPrimary),
-        size: 24,
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
-      onPressed: onPressed,
+      child: IconButton(
+        icon: Icon(
+          icon,
+          color: iconColor ?? (isDark ? Colors.white : AppColors.textPrimary),
+          size: 20,
+        ),
+        onPressed: onPressed,
+      ),
     );
   }
 
-  Widget _buildHeaderContent(
-      BuildContext context, String word, String phonetic, String pos) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final headerTextColor =
-        isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary;
+  // YELLOW HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
+  Widget _buildHeaderAndSimpleMeaning(BuildContext context, LexicalEntry entry) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Expanded(
-              child: Text(
-                word.toUpperCase(),
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      fontSize: 38,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1.2,
-                      color: headerTextColor,
-                      height: 1.0,
-                    ),
-              ),
-            ),
-            if (widget.entry!.core.homograph > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black12,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '#${widget.entry!.core.homograph}',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: headerTextColor),
-                ),
-              )
-            ]
+    final word = entry.core.headword;
+    final phonetic = entry.core.phonetic;
+    final pos = entry.core.partOfSpeech;
+    final simpleMeaning = entry.lexiLens.simpleMeaning;
+
+    final blobColor = isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow;
+    final headerTextColor = isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary;
+
+    final formattedMeaning = simpleMeaning.isNotEmpty
+        ? (simpleMeaning.replaceFirst(simpleMeaning[0], simpleMeaning[0].toUpperCase()) + (simpleMeaning.endsWith('.') ? '' : '.'))
+        : 'Vocabulary term';
+
+    return GestureDetector(
+      onTap: () {
+        _playAudio(entry.core.audioUrl);
+        HapticFeedback.lightImpact();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: blobColor,
+          borderRadius: BorderRadius.circular(32),
+          border: isDark ? Border.all(color: headerTextColor.withOpacity(0.3), width: 1.5) : null,
+          boxShadow: [
+            BoxShadow(
+              color: blobColor.withOpacity(0.28),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            )
           ],
         ),
-        if (phonetic.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 4),
+            // Word Title
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                word.toUpperCase(),
+                style: theme.textTheme.displayLarge?.copyWith(
+                  fontSize: word.length > 14 ? 28 : (word.length > 10 ? 32 : 36),
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.8,
+                  color: headerTextColor,
+                  height: 1.1,
+                ),
+              ),
+            ),
+            if (phonetic.isNotEmpty) ...[
+              const SizedBox(height: 14),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    phonetic,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  Row(
+                    children: [
+                      Text(
+                        phonetic,
+                        style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: headerTextColor,
                           fontSize: 18,
                         ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Audio Speaker Button
-                  GestureDetector(
-                    onTap: () => _playAudio(widget.entry!.core.audioUrl),
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.black38 : Colors.white.withOpacity(0.6),
-                        shape: BoxShape.circle,
                       ),
-                      child: _isPlaying 
-                          ? const SizedBox(
-                              width: 18, 
-                              height: 18, 
-                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryPurple)
-                            )
-                          : Icon(CupertinoIcons.speaker_2_fill, size: 18, color: headerTextColor),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // Slow-Motion Audio Speed Toggle (1.0x / 0.75x)
-                  GestureDetector(
-                    onTap: _toggleAudioSpeed,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _audioSpeed == 0.75 
-                            ? AppColors.primaryPurple 
-                            : (isDark ? Colors.black26 : Colors.white.withOpacity(0.5)),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${_audioSpeed}x',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: _audioSpeed == 0.75 ? Colors.white : headerTextColor,
+                      const SizedBox(width: 8),
+                      // Audio Speaker Button
+                      _BouncyTouch(
+                        onTap: () => _playAudio(entry.core.audioUrl),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _isPlaying 
+                                ? AppColors.primaryPurple 
+                                : (isDark ? Colors.black38 : Colors.white.withOpacity(0.75)),
+                            shape: BoxShape.circle,
+                            boxShadow: _isPlaying
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primaryPurple.withOpacity(0.5),
+                                      blurRadius: 10,
+                                      spreadRadius: 2,
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: _isPlaying
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Icon(
+                                  CupertinoIcons.speaker_2_fill, 
+                                  size: 16, 
+                                  color: _isPlaying ? Colors.white : headerTextColor
+                                ),
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      // Audio Speed Pill
+                      _BouncyTouch(
+                        onTap: _toggleAudioSpeed,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _audioSpeed == 0.75
+                                ? AppColors.primaryPurple
+                                : (isDark ? Colors.black26 : Colors.white.withOpacity(0.5)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${_audioSpeed}x',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: _audioSpeed == 0.75 ? Colors.white : headerTextColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // B2 Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkBadgeTeal : AppColors.badgeTeal,
+                      borderRadius: BorderRadius.circular(20),
+                      border: isDark ? Border.all(color: AppColors.darkBadgeTealText, width: 1.5) : null,
+                    ),
+                    child: Text(
+                      'B2',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? AppColors.darkBadgeTealText : AppColors.textPrimary,
+                      ),
+                    ),
+                  )
+                ],
+              ),
+            ],
+            if (pos.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                pos,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: headerTextColor.withOpacity(0.85),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+
+            // SIMPLE MEANING HERO CARD
+            _buildOverlappingSimpleMeaningCard(context, formattedMeaning),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // SIMPLE MEANING HERO CARD WITH FLUID RECALL REVEAL ANIMATION
+  Widget _buildOverlappingSimpleMeaningCard(BuildContext context, String meaning) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 350),
+      switchInCurve: Curves.easeOutBack,
+      switchOutCurve: Curves.easeInQuad,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: (_isRecallMode && !_isMeaningRevealed)
+          ? _BouncyTouch(
+              key: const ValueKey('recall_active'),
+              onTap: () {
+                setState(() => _isMeaningRevealed = true);
+                HapticFeedback.lightImpact();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF232333) : const Color(0xFFFFFBF0),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: theme.primaryColor, width: 2.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(CupertinoIcons.eye_slash_fill, size: 20, color: theme.primaryColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'RECALL MODE ACTIVE',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: theme.primaryColor,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Tap to reveal answer 👁️',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            )
+          : Container(
+              key: const ValueKey('meaning_revealed'),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF232333) : const Color(0xFFFFFBF2),
+                borderRadius: BorderRadius.circular(24),
+                border: isDark
+                    ? Border.all(color: Colors.white12, width: 1.5)
+                    : Border.all(color: const Color(0xFFEFE8D8), width: 1.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Yellow Circle with Lightbulb
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CupertinoIcons.lightbulb,
+                      size: 20,
+                      color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Simple meaning',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white60 : const Color(0xFF555566),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          meaning,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            height: 1.3,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkBadgeTeal : AppColors.badgeTeal,
-                  borderRadius: BorderRadius.circular(20),
-                  border: isDark
-                      ? Border.all(color: AppColors.darkBadgeTealText, width: 1.5)
-                      : null,
-                ),
-                child: Text(
-                  'B2',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: isDark
-                            ? AppColors.darkBadgeTealText
-                            : AppColors.textPrimary,
-                      ),
-                ),
-              )
-            ],
-          ),
-        ],
-        const SizedBox(height: 8),
-        Text(
-          pos,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: headerTextColor.withOpacity(0.85),
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-      ],
+            ),
     );
   }
 
@@ -876,19 +1072,25 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   ],
                 ),
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? Colors.white24 : Colors.white,
-                  foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                  side: isDark ? null : const BorderSide(color: AppColors.border),
-                ),
-                onPressed: () async {
+              _BouncyTouch(
+                onTap: () async {
                   final db = ref.read(databaseProvider);
                   await db.updateReviewState(savedWord.id, (stateIndex + 1) % 3);
                 },
-                child: const Text('Update'),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? Colors.white24 : Colors.white,
+                    foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    side: isDark ? null : const BorderSide(color: AppColors.border),
+                  ),
+                  onPressed: () async {
+                    final db = ref.read(databaseProvider);
+                    await db.updateReviewState(savedWord.id, (stateIndex + 1) % 3);
+                  },
+                  child: const Text('Update'),
+                ),
               )
             ],
           ),
@@ -896,134 +1098,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  // HIGHLIGHTED "SIMPLE MEANING" CARD WITH RECALL MODE / SIMPLICITY
-  Widget _buildSimpleMeaningCard(BuildContext context, String meaning) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final formattedMeaning = meaning.isNotEmpty
-        ? (meaning.replaceFirst(meaning[0], meaning[0].toUpperCase()) + (meaning.endsWith('.') ? '' : '.'))
-        : 'Vocabulary term';
-
-    // If Recall/Quiz Mode is active and meaning is hidden
-    if (_isRecallMode && !_isMeaningRevealed) {
-      return GestureDetector(
-        onTap: () {
-          setState(() => _isMeaningRevealed = true);
-          HapticFeedback.lightImpact();
-        },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.primaryPurple, width: 2.0),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(CupertinoIcons.eye_slash_fill, size: 20, color: AppColors.primaryPurple),
-                  const SizedBox(width: 8),
-                  Text(
-                    'RECALL MODE ACTIVE',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primaryPurple,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Can you recall the meaning?',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryPurple,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Text(
-                  'Tap to Reveal Answer 👁️',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                ),
-              )
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
-        borderRadius: BorderRadius.circular(28),
-        border: isDark 
-            ? Border.all(color: AppColors.darkSoftYellowText.withOpacity(0.4), width: 1.5) 
-            : Border.all(color: AppColors.border, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.black26 : Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  CupertinoIcons.lightbulb_fill,
-                  size: 16,
-                  color: isDark ? AppColors.darkSoftYellowText : AppColors.primaryPurple,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'SIMPLE MEANING',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                  color: isDark ? AppColors.darkSoftYellowText : AppColors.primaryPurple,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            formattedMeaning,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              fontSize: 18,
-              height: 1.4,
-              color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1618,9 +1692,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: _fetchedSynonyms.map((syn) {
-                  return InkWell(
+                  return _BouncyTouch(
                     onTap: () => _navigateToWord(context, syn),
-                    borderRadius: BorderRadius.circular(16),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -1666,9 +1739,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: _fetchedAntonyms.map((ant) {
-                  return InkWell(
+                  return _BouncyTouch(
                     onTap: () => _navigateToWord(context, ant),
-                    borderRadius: BorderRadius.circular(16),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -1863,58 +1935,157 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   Widget _buildSavedButton(BuildContext context, WidgetRef ref, bool isSaved) {
     final theme = Theme.of(context);
 
-    return Container(
-      width: double.infinity,
-      height: 64,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: (isSaved ? theme.primaryColor : AppColors.buttonBlack).withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isSaved ? theme.primaryColor : AppColors.buttonBlack,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-        ),
-        onPressed: () => _toggleSaveWord(context, ref),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSaved ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              isSaved ? 'Saved to My Vocabulary' : 'Save to My Vocabulary',
-              style: theme.textTheme.titleSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: isSaved ? const Color(0xFF86D568) : Colors.white24,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isSaved ? CupertinoIcons.check_mark : CupertinoIcons.add,
-                color: Colors.white,
-                size: 12,
-                weight: 800,
-              ),
-            ),
+    return _BouncyTouch(
+      onTap: () => _toggleSaveWord(context, ref),
+      child: Container(
+        width: double.infinity,
+        height: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [
+            BoxShadow(
+              color: (isSaved ? theme.primaryColor : AppColors.buttonBlack).withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            )
           ],
         ),
+        child: ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isSaved ? theme.primaryColor : AppColors.buttonBlack,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+          ),
+          onPressed: () => _toggleSaveWord(context, ref),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isSaved ? CupertinoIcons.bookmark_fill : CupertinoIcons.bookmark,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                isSaved ? 'Saved to My Vocabulary' : 'Save to My Vocabulary',
+                style: theme.textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isSaved ? const Color(0xFF86D568) : Colors.white24,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isSaved ? CupertinoIcons.check_mark : CupertinoIcons.add,
+                  color: Colors.white,
+                  size: 12,
+                  weight: 800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// FLUID STAGGERED ENTRANCE ANIMATED WIDGET
+class _FluidAnimatedCard extends StatefulWidget {
+  final Widget child;
+  final int index;
+
+  const _FluidAnimatedCard({required this.child, required this.index});
+
+  @override
+  State<_FluidAnimatedCard> createState() => _FluidAnimatedCardState();
+}
+
+class _FluidAnimatedCardState extends State<_FluidAnimatedCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    // Stagger delay based on card index
+    final startDelay = (widget.index * 0.08).clamp(0.0, 0.6);
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(startDelay, 1.0, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Interval(startDelay, 1.0, curve: Curves.easeOutCubic),
+    ));
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+// SPRING BOUNCY TOUCH MICRO-INTERACTION WIDGET
+class _BouncyTouch extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _BouncyTouch({super.key, required this.child, required this.onTap});
+
+  @override
+  State<_BouncyTouch> createState() => _BouncyTouchState();
+}
+
+class _BouncyTouchState extends State<_BouncyTouch> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutQuad,
+        child: widget.child,
       ),
     );
   }
