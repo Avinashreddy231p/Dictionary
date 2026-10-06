@@ -69,7 +69,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _lastQuery = cleanQuery;
     });
 
-    final searchResult = await _repository.searchWord(cleanQuery);
+    final repository = ref.read(dictionaryRepositoryProvider);
+    final searchResult = await repository.searchWord(cleanQuery);
 
     setState(() {
       _results = searchResult.entries;

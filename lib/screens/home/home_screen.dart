@@ -672,9 +672,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 10,
+                      runSpacing: 4,
                       children: [
                         Text(
                           wordTitle,
@@ -683,8 +684,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             fontSize: 22,
                           ),
                         ),
-                        if (phonetic.isNotEmpty) ...[
-                          const SizedBox(width: 10),
+                        if (phonetic.isNotEmpty)
                           Text(
                             phonetic,
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -693,7 +693,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               fontSize: 14,
                             ),
                           ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 8),

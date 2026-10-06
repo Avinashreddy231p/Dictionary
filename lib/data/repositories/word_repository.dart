@@ -15,7 +15,7 @@ class WordRepository {
       if (apiResults.entries.isNotEmpty) return apiResults.entries;
     } catch (_) {}
 
-    // Fallback to local database
+    // Fallback 1: Local saved user words
     var saved = await _db.getSavedWordByWord(query);
     if (saved == null) {
       final fuzzyMatches = await _db.searchSavedWordsFuzzy(query);
@@ -69,6 +69,18 @@ class WordRepository {
         )
       ];
     }
+
+    // Fallback 2: Offline Backup Dictionary (english Dictionary.csv dataset)
+    final offlineEntry = await _db.getOfflineWord(query);
+    if (offlineEntry != null) {
+      return [offlineEntry];
+    }
+
+    final offlineFuzzy = await _db.searchOfflineWordsFuzzy(query);
+    if (offlineFuzzy.isNotEmpty) {
+      return [offlineFuzzy.first];
+    }
+
     return [];
   }
 }

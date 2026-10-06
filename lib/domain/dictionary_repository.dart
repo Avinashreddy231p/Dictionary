@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/database/database.dart';
 import '../data/models/lexical_entry.dart';
 import '../data/services/merriam_webster_service.dart';
 import '../core/utils/fuzzy_search.dart';
@@ -22,23 +23,67 @@ class SearchResult {
 
 class DictionaryRepository {
   final MerriamWebsterService _service;
+  final AppDatabase? _db;
 
-  DictionaryRepository({MerriamWebsterService? service})
-      : _service = service ?? MerriamWebsterService();
+  DictionaryRepository({
+    MerriamWebsterService? service,
+    AppDatabase? db,
+  })  : _service = service ?? MerriamWebsterService(),
+        _db = db;
 
   Future<SearchResult> searchWord(String query) async {
     try {
       final cleanQuery = query.trim().toLowerCase();
       if (cleanQuery.isEmpty) return SearchResult(entries: [], suggestions: []);
 
-      // 1. Direct Search via Merriam-Webster API
-      var mwResult = await _service.fetchWord(cleanQuery);
-
-      if (mwResult.entries.isNotEmpty) {
-        return _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
+      // 1. Direct Search via Merriam-Webster API (Online)
+      try {
+        var mwResult = await _service.fetchWord(cleanQuery);
+        if (mwResult.entries.isNotEmpty) {
+          return _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
+        }
+      } catch (_) {
+        // Online API failed or offline
       }
 
-      // 2. Specialized Multi-Word Phrase & Idiom Resolution Engine
+      // 2. Check Saved Words in local AppDatabase
+      if (_db != null) {
+        try {
+          final savedWord = await _db.getSavedWordByWord(cleanQuery);
+          if (savedWord != null) {
+            final entry = _convertSavedToLexicalEntry(savedWord);
+            return SearchResult(entries: [entry], suggestions: []);
+          }
+        } catch (_) {}
+      }
+
+      // 3. Fallback to Offline Backup Dictionary Database (english Dictionary.csv dataset)
+      if (_db != null) {
+        try {
+          final offlineEntry = await _db.getOfflineWord(cleanQuery);
+          if (offlineEntry != null) {
+            return SearchResult(
+              entries: [offlineEntry],
+              suggestions: [],
+              isFuzzyMatch: false,
+            );
+          }
+
+          // Fuzzy search in offline backup database
+          final offlineFuzzy = await _db.searchOfflineWordsFuzzy(cleanQuery);
+          if (offlineFuzzy.isNotEmpty) {
+            final suggestions = offlineFuzzy.map((e) => e.core.headword).toList();
+            return SearchResult(
+              entries: [offlineFuzzy.first],
+              suggestions: suggestions.skip(1).toList(),
+              isFuzzyMatch: true,
+              correctedQuery: offlineFuzzy.first.core.headword,
+            );
+          }
+        } catch (_) {}
+      }
+
+      // 4. Specialized Multi-Word Phrase & Idiom Resolution Engine
       if (cleanQuery.contains(' ')) {
         final phraseEntry = await _resolvePhraseWithDatamuse(cleanQuery);
         if (phraseEntry != null) {
@@ -51,39 +96,42 @@ class DictionaryRepository {
 
         // Try concatenated single-word variant (e.g. "micro interactions" -> "microinteractions")
         final noSpaces = cleanQuery.replaceAll(' ', '');
-        final altResult = await _service.fetchWord(noSpaces);
-        if (altResult.entries.isNotEmpty) {
-          return _enrichAndReturn(
-            noSpaces,
-            altResult.entries,
-            altResult.suggestions,
-            isFuzzy: true,
-            correctedQuery: noSpaces,
-          );
-        }
+        try {
+          final altResult = await _service.fetchWord(noSpaces);
+          if (altResult.entries.isNotEmpty) {
+            return _enrichAndReturn(
+              noSpaces,
+              altResult.entries,
+              altResult.suggestions,
+              isFuzzy: true,
+              correctedQuery: noSpaces,
+            );
+          }
+        } catch (_) {}
 
-        // Try constituent key words (e.g. "advanced vocabulary" -> "vocabulary")
+        // Try constituent key words
         final parts = cleanQuery.split(' ');
         for (var part in parts.reversed) {
           if (part.length > 2) {
-            final partResult = await _service.fetchWord(part);
-            if (partResult.entries.isNotEmpty) {
-              return _enrichAndReturn(
-                part,
-                partResult.entries,
-                partResult.suggestions,
-                isFuzzy: true,
-                correctedQuery: part,
-              );
-            }
+            try {
+              final partResult = await _service.fetchWord(part);
+              if (partResult.entries.isNotEmpty) {
+                return _enrichAndReturn(
+                  part,
+                  partResult.entries,
+                  partResult.suggestions,
+                  isFuzzy: true,
+                  correctedQuery: part,
+                );
+              }
+            } catch (_) {}
           }
         }
       }
 
-      // 3. Advanced Multi-Source Fuzzy Search
-      List<String> rawSuggestions = List.from(mwResult.suggestions);
+      // 5. Advanced Multi-Source Fuzzy Search
+      List<String> rawSuggestions = [];
 
-      // Fetch Datamuse spelling and phonetic candidates for fuzzy resolution
       try {
         final spRes = await http.get(
             Uri.parse('https://api.datamuse.com/words?sp=${Uri.encodeComponent(cleanQuery)}*&max=8'));
@@ -110,7 +158,6 @@ class DictionaryRepository {
         }
       } catch (_) {}
 
-      // Rank candidates using Levenshtein similarity distance
       final fuzzyMatches = FuzzySearch.rankMatches<String>(
         query: cleanQuery,
         candidates: rawSuggestions,
@@ -121,21 +168,22 @@ class DictionaryRepository {
 
       final rankedSuggestions = fuzzyMatches.map((m) => m.word).toList();
 
-      // If we have a high-confidence top fuzzy candidate, attempt auto-correction lookup
       if (fuzzyMatches.isNotEmpty) {
         final topMatch = fuzzyMatches.first;
         if (topMatch.similarity >= 0.55 || topMatch.distance <= 2) {
-          final fuzzyMwResult = await _service.fetchWord(topMatch.word);
-          if (fuzzyMwResult.entries.isNotEmpty) {
-            return _enrichAndReturn(
-              topMatch.word,
-              fuzzyMwResult.entries,
-              rankedSuggestions.where((s) => s != topMatch.word).toList(),
-              isFuzzy: true,
-              correctedQuery: topMatch.word,
-              confidence: topMatch.similarity,
-            );
-          }
+          try {
+            final fuzzyMwResult = await _service.fetchWord(topMatch.word);
+            if (fuzzyMwResult.entries.isNotEmpty) {
+              return _enrichAndReturn(
+                topMatch.word,
+                fuzzyMwResult.entries,
+                rankedSuggestions.where((s) => s != topMatch.word).toList(),
+                isFuzzy: true,
+                correctedQuery: topMatch.word,
+                confidence: topMatch.similarity,
+              );
+            }
+          } catch (_) {}
         }
       }
 
@@ -148,12 +196,55 @@ class DictionaryRepository {
     }
   }
 
+  LexicalEntry _convertSavedToLexicalEntry(SavedWord saved) {
+    final headword = saved.word;
+    final pos = saved.partOfSpeech ?? 'word';
+    final phonetic = saved.phonetic ?? '';
+    final meaning = saved.meaning ?? 'Saved vocabulary word';
+    final example = saved.example;
+    final syllables = saved.syllables?.split('*') ?? [headword];
+
+    return LexicalEntry(
+      core: CoreData(
+        headword: headword,
+        homograph: 0,
+        partOfSpeech: pos,
+        phonetic: phonetic,
+        audioUrl: '',
+        syllables: syllables,
+      ),
+      senses: [
+        Sense(
+          senseNumber: '1',
+          definition: meaning,
+          examples: example != null ? [example] : [],
+          labels: [],
+        )
+      ],
+      grammar: GrammarData(
+        verbDivision: '',
+        usageNotes: [],
+        inflections: [],
+        relatedForms: [],
+      ),
+      linguistic: LinguisticData(
+        etymology: '',
+        firstKnownUse: '',
+      ),
+      lexiLens: LexiLensLayer(
+        simpleMeaning: meaning,
+        contextualMeaning: saved.contextSentence ?? '',
+        synonyms: [],
+        antonyms: [],
+      ),
+    );
+  }
+
   /// Resolves definitions and synonyms for phrases and idioms using Datamuse API (md=d, ml=phrase)
   Future<_PhraseResolution?> _resolvePhraseWithDatamuse(String phrase) async {
     try {
       final encodedPhrase = Uri.encodeComponent(phrase);
 
-      // Query Datamuse "means like" (ml) with definitions (md=d)
       final mlUrl = 'https://api.datamuse.com/words?ml=$encodedPhrase&md=d&max=6';
       final response = await http.get(Uri.parse(mlUrl));
 
@@ -175,7 +266,6 @@ class DictionaryRepository {
               final defsList = item['defs'] as List?;
               if (defsList != null && defsList.isNotEmpty) {
                 final rawDef = defsList.first as String;
-                // Strip POS prefix e.g. "n\tsomething easy" -> "something easy"
                 foundDef = rawDef.replaceAll(RegExp(r'^[a-z]+\t'), '').trim();
               }
             }

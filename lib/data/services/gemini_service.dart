@@ -1,0 +1,331 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+
+class GeminiTestResult {
+  final bool success;
+  final String? errorMessage;
+  final String? workingModel;
+
+  GeminiTestResult({
+    required this.success,
+    this.errorMessage,
+    this.workingModel,
+  });
+}
+
+class GeminiModelInfo {
+  final String id;
+  final String name;
+  final String description;
+
+  GeminiModelInfo({
+    required this.id,
+    required this.name,
+    required this.description,
+  });
+}
+
+class GeminiService {
+  final String defaultModel;
+
+  GeminiService({this.defaultModel = 'gemini-2.0-flash'});
+
+  String _cleanKey(String key) {
+    return key
+        .trim()
+        .replaceAll('"', '')
+        .replaceAll("'", "")
+        .replaceAll('\n', '')
+        .replaceAll('\r', '')
+        .replaceAll('\t', '');
+  }
+
+  Future<List<GeminiModelInfo>> fetchAvailableModels({String? apiKey}) async {
+    final cleanKey = apiKey != null ? _cleanKey(apiKey) : '';
+    if (cleanKey.isEmpty) {
+      return getDefaultModels();
+    }
+
+    final url = Uri.parse('https://generativelanguage.googleapis.com/v1beta/models?key=$cleanKey');
+
+    try {
+      final response = await http
+          .get(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': cleanKey,
+            },
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rawModels = data['models'] as List?;
+        if (rawModels != null && rawModels.isNotEmpty) {
+          final List<GeminiModelInfo> parsed = [];
+
+          for (final m in rawModels) {
+            final nameStr = (m['name'] as String? ?? '').replaceFirst('models/', '');
+            final methods = (m['supportedGenerationMethods'] as List?)?.cast<String>() ?? [];
+
+            if (methods.contains('generateContent') && nameStr.contains('gemini')) {
+              final displayName = m['displayName'] as String? ?? _formatModelName(nameStr);
+              final desc = m['description'] as String? ?? 'Google Gemini AI model';
+
+              parsed.add(GeminiModelInfo(
+                id: nameStr,
+                name: displayName,
+                description: desc,
+              ));
+            }
+          }
+
+          if (parsed.isNotEmpty) {
+            parsed.sort((a, b) {
+              if (a.id.contains('2.0') && !b.id.contains('2.0')) return -1;
+              if (!a.id.contains('2.0') && b.id.contains('2.0')) return 1;
+              return a.id.compareTo(b.id);
+            });
+            return parsed;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return getDefaultModels();
+  }
+
+  List<GeminiModelInfo> getDefaultModels() {
+    return [
+      GeminiModelInfo(
+        id: 'gemini-2.0-flash',
+        name: 'Gemini 2.0 Flash',
+        description: 'Recommended • Next-gen speed & intelligence',
+      ),
+      GeminiModelInfo(
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        description: 'Fast & lightweight for daily lookups',
+      ),
+      GeminiModelInfo(
+        id: 'gemini-1.5-pro',
+        name: 'Gemini 1.5 Pro',
+        description: 'Deep reasoning & complex nuance analysis',
+      ),
+    ];
+  }
+
+  String _formatModelName(String modelId) {
+    return modelId
+        .split('-')
+        .map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : '')
+        .join(' ');
+  }
+
+  List<String> _getModelsToTry(String? selectedModel) {
+    final primary = selectedModel?.trim().isNotEmpty == true ? selectedModel!.trim() : defaultModel;
+    final fallbackList = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
+    final models = <String>[primary];
+    for (final m in fallbackList) {
+      if (!models.contains(m)) {
+        models.add(m);
+      }
+    }
+    return models;
+  }
+
+  Future<GeminiTestResult> testApiKey(String apiKey, {String? model}) async {
+    final cleanKey = _cleanKey(apiKey);
+    if (cleanKey.isEmpty) {
+      return GeminiTestResult(
+        success: false,
+        errorMessage: 'API Key is empty. Please enter a valid Gemini API Key.',
+      );
+    }
+
+    final modelsToTry = _getModelsToTry(model);
+    String lastError = 'Failed to connect to Gemini API.';
+
+    for (final targetModel in modelsToTry) {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanKey',
+      );
+
+      try {
+        final response = await http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': cleanKey,
+              },
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'parts': [
+                      {'text': 'Hello'}
+                    ]
+                  }
+                ]
+              }),
+            )
+            .timeout(const Duration(seconds: 12));
+
+        if (response.statusCode == 200) {
+          return GeminiTestResult(success: true, workingModel: targetModel);
+        }
+
+        String errorMsg;
+        try {
+          final body = jsonDecode(response.body);
+          errorMsg = body['error']?['message'] ?? 'HTTP ${response.statusCode}';
+        } catch (_) {
+          errorMsg = 'HTTP ${response.statusCode}: ${response.reasonPhrase ?? response.body}';
+        }
+
+        if (response.statusCode == 400 || response.statusCode == 404) {
+          lastError = 'Model $targetModel error: $errorMsg';
+          continue;
+        } else if (response.statusCode == 401 || response.statusCode == 403) {
+          return GeminiTestResult(
+            success: false,
+            errorMessage: 'Invalid or restricted API Key ($errorMsg). Please verify your Google AI Studio key.',
+          );
+        } else if (response.statusCode == 429) {
+          return GeminiTestResult(
+            success: false,
+            errorMessage: 'API Key rate limit / quota exceeded ($errorMsg).',
+          );
+        } else {
+          lastError = errorMsg;
+        }
+      } on TimeoutException {
+        lastError = 'Connection timed out. Please check your network connection.';
+      } on SocketException {
+        lastError = 'Network error. Please check your internet connection.';
+      } catch (e) {
+        lastError = e.toString().replaceAll('Exception: ', '');
+      }
+    }
+
+    return GeminiTestResult(success: false, errorMessage: lastError);
+  }
+
+  Future<String> generateMnemonic(
+    String word,
+    String meaning, {
+    required String apiKey,
+    String? model,
+  }) async {
+    final prompt =
+        'Create a memorable, clever, and concise mnemonic device to help remember the word "$word" which means "$meaning". Keep it under 3 sentences.';
+    return _generateContent(prompt, apiKey: apiKey, model: model);
+  }
+
+  Future<String> explainNuance(
+    String word,
+    String partOfSpeech,
+    String meaning, {
+    required String apiKey,
+    String? model,
+  }) async {
+    final prompt =
+        'Explain the subtle nuance, emotional tone, and usage context of the $partOfSpeech "$word" ($meaning) compared to common synonyms. Keep it clear, concise, and educational (2-3 short paragraphs max).';
+    return _generateContent(prompt, apiKey: apiKey, model: model);
+  }
+
+  Future<String> generateContextExamples(
+    String word,
+    String partOfSpeech, {
+    required String apiKey,
+    String? model,
+  }) async {
+    final prompt =
+        'Provide 3 distinct, practical example sentences using the $partOfSpeech "$word" in: 1) Casual conversation, 2) Professional/workplace setting, 3) Literature/journalism. Number each example clearly.';
+    return _generateContent(prompt, apiKey: apiKey, model: model);
+  }
+
+  Future<String> _generateContent(
+    String prompt, {
+    required String apiKey,
+    String? model,
+  }) async {
+    final cleanKey = _cleanKey(apiKey);
+    if (cleanKey.isEmpty) {
+      throw Exception('Gemini API key is required. Please add your key in Settings.');
+    }
+
+    final modelsToTry = _getModelsToTry(model);
+    String lastError = 'Failed to generate AI response.';
+
+    for (final targetModel in modelsToTry) {
+      final url = Uri.parse(
+        'https://generativelanguage.googleapis.com/v1beta/models/$targetModel:generateContent?key=$cleanKey',
+      );
+
+      try {
+        final response = await http
+            .post(
+              url,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': cleanKey,
+              },
+              body: jsonEncode({
+                'contents': [
+                  {
+                    'parts': [
+                      {'text': prompt}
+                    ]
+                  }
+                ]
+              }),
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+          if (text != null && text.trim().isNotEmpty) {
+            return text.trim();
+          }
+          throw Exception('Empty response received from Gemini AI.');
+        }
+
+        String errorMsg;
+        try {
+          final body = jsonDecode(response.body);
+          errorMsg = body['error']?['message'] ?? 'HTTP ${response.statusCode}';
+        } catch (_) {
+          errorMsg = 'HTTP ${response.statusCode}: ${response.reasonPhrase ?? response.body}';
+        }
+
+        if (response.statusCode == 400 || response.statusCode == 404) {
+          lastError = errorMsg;
+          continue;
+        } else if (response.statusCode == 401 || response.statusCode == 403) {
+          throw Exception('Invalid or unauthorized API key ($errorMsg). Please check your key in Settings.');
+        } else if (response.statusCode == 429) {
+          throw Exception('Gemini AI quota exceeded / rate limited ($errorMsg). Try again later.');
+        } else {
+          lastError = errorMsg;
+        }
+      } on TimeoutException {
+        lastError = 'Request timed out. Please check your internet connection and try again.';
+      } on SocketException {
+        lastError = 'Network error. Please check your internet connection.';
+      } catch (e) {
+        if (e.toString().contains('Invalid or unauthorized') || e.toString().contains('quota exceeded')) {
+          rethrow;
+        }
+        lastError = e.toString().replaceAll('Exception: ', '');
+      }
+    }
+
+    throw Exception(lastError);
+  }
+}

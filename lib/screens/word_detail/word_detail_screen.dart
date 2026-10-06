@@ -768,26 +768,29 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           children: [
             const SizedBox(height: 4),
             // Word Title
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                word.toUpperCase(),
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: word.length > 14 ? 28 : (word.length > 10 ? 32 : 36),
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.8,
-                  color: headerTextColor,
-                  height: 1.1,
-                ),
+            Text(
+              word.toUpperCase(),
+              softWrap: true,
+              style: theme.textTheme.displayLarge?.copyWith(
+                fontSize: word.length > 14 ? 26 : (word.length > 10 ? 30 : 36),
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.8,
+                color: headerTextColor,
+                height: 1.1,
               ),
             ),
             if (phonetic.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
                 children: [
-                  Row(
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       Text(
                         phonetic,
@@ -797,7 +800,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           fontSize: 18,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       // Audio Speaker Button
                       _BouncyTouch(
                         onTap: () => _playAudio(entry.core.audioUrl),
@@ -807,7 +809,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           decoration: BoxDecoration(
                             color: _isPlaying 
                                 ? AppColors.primaryPurple 
-                                : (isDark ? Colors.black38 : Colors.white.withOpacity(0.75)),
+                                : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.75)),
                             shape: BoxShape.circle,
                             boxShadow: _isPlaying
                                 ? [
@@ -832,7 +834,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                                 ),
                         ),
                       ),
-                      const SizedBox(width: 6),
                       // Audio Speed Pill
                       _BouncyTouch(
                         onTap: _toggleAudioSpeed,
@@ -842,7 +843,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           decoration: BoxDecoration(
                             color: _audioSpeed == 0.75
                                 ? AppColors.primaryPurple
-                                : (isDark ? Colors.black26 : Colors.white.withOpacity(0.5)),
+                                : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.5)),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -872,7 +873,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                         color: isDark ? AppColors.darkBadgeTealText : AppColors.textPrimary,
                       ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ],
@@ -924,7 +925,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF232333) : const Color(0xFFFFFBF0),
+                  color: isDark ? AppColors.darkSurface : const Color(0xFFFFFBF0),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: theme.primaryColor, width: 2.0),
                   boxShadow: [
@@ -975,10 +976,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               key: const ValueKey('meaning_revealed'),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF232333) : const Color(0xFFFFFBF2),
+                color: isDark ? AppColors.darkSurface : const Color(0xFFFFFBF2),
                 borderRadius: BorderRadius.circular(24),
                 border: isDark
-                    ? Border.all(color: Colors.white12, width: 1.5)
+                    ? Border.all(color: AppColors.darkBorder, width: 1.5)
                     : Border.all(color: const Color(0xFFEFE8D8), width: 1.0),
                 boxShadow: [
                   BoxShadow(
@@ -1015,7 +1016,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white60 : const Color(0xFF555566),
+                            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF555566),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1025,7 +1026,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
                             height: 1.3,
-                            color: isDark ? Colors.white : AppColors.textPrimary,
+                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -1049,21 +1050,23 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         final states = ['Learning', 'Reviewing', 'Mastered'];
         final colors = [AppColors.softPeach, AppColors.softBlue, AppColors.softGreen];
         final darkColors = [AppColors.darkSoftPink, AppColors.darkSoftBlue, AppColors.darkSoftGreen];
+        final darkTextColors = [AppColors.darkSoftPinkText, AppColors.darkSoftBlueText, AppColors.darkSoftGreenText];
         final icons = [CupertinoIcons.book, CupertinoIcons.arrow_2_circlepath, CupertinoIcons.star_fill];
 
         final stateIndex = savedWord.reviewState.clamp(0, 2);
         final bgColor = isDark ? darkColors[stateIndex] : colors[stateIndex];
+        final textColor = isDark ? darkTextColors[stateIndex] : AppColors.textPrimary;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(24),
-            border: isDark ? Border.all(color: Colors.white24) : Border.all(color: AppColors.border),
+            border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
-              Icon(icons[stateIndex], color: isDark ? Colors.white : AppColors.textPrimary),
+              Icon(icons[stateIndex], color: textColor),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1073,7 +1076,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       'Learning Progress',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        color: isDark ? textColor.withOpacity(0.8) : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1081,7 +1084,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       states[stateIndex],
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : AppColors.textPrimary,
+                        color: textColor,
                       ),
                     ),
                   ],
@@ -1094,11 +1097,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                 },
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDark ? Colors.white24 : Colors.white,
-                    foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                    backgroundColor: isDark ? AppColors.darkTileBg : Colors.white,
+                    foregroundColor: textColor,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
-                    side: isDark ? null : const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: isDark ? textColor.withOpacity(0.4) : AppColors.border),
                   ),
                   onPressed: () async {
                     final db = ref.read(databaseProvider);
@@ -1374,7 +1377,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             decoration: InputDecoration(
               hintText: 'Add a personal memory or reading context...',
               filled: true,
-              fillColor: isDark ? Colors.white10 : AppColors.background,
+              fillColor: isDark ? AppColors.darkTileBg : AppColors.background,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
               contentPadding: const EdgeInsets.all(12),
             ),
@@ -1928,7 +1931,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isDark ? Colors.white10 : AppColors.background,
+                color: isDark ? AppColors.darkTileBg : AppColors.background,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
@@ -2255,8 +2258,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? primaryColor
-                : (isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4)),
+                : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4)),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? primaryColor
+                  : (isDark ? AppColors.darkBorder : AppColors.border),
+            ),
           ),
           child: Text(
             label,

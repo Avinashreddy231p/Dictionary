@@ -225,10 +225,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1D1D2C) : AppColors.softPurple.withOpacity(0.4),
+        color: isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+          color: isDark ? AppColors.darkBorder : AppColors.border,
         ),
       ),
       child: Row(

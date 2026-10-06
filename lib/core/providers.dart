@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'database/database.dart';
 import '../data/repositories/word_repository.dart';
+import '../domain/dictionary_repository.dart';
 import '../data/services/gemini_service.dart';
+import '../data/services/offline_dictionary_service.dart';
 import 'providers/settings_provider.dart';
 
 export 'providers/settings_provider.dart';
+export '../data/services/gemini_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -17,6 +20,21 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 final wordRepositoryProvider = Provider<WordRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return WordRepository(db);
+});
+
+final dictionaryRepositoryProvider = Provider<DictionaryRepository>((ref) {
+  final db = ref.watch(databaseProvider);
+  return DictionaryRepository(db: db);
+});
+
+final offlineDictionaryServiceProvider = Provider<OfflineDictionaryService>((ref) {
+  final db = ref.watch(databaseProvider);
+  return OfflineDictionaryService(db);
+});
+
+final offlineWordsCountStreamProvider = StreamProvider<int>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchOfflineWordsCount();
 });
 
 final geminiServiceProvider = Provider<GeminiService>((ref) {

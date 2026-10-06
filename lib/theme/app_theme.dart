@@ -128,6 +128,40 @@ class AppTheme {
         thickness: 1.5,
         space: 24,
       ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.softPurple,
+        disabledColor: AppColors.border,
+        selectedColor: accentColor,
+        secondarySelectedColor: accentColor,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        labelStyle: GoogleFonts.nunito(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
+        secondaryLabelStyle: GoogleFonts.nunito(
+          fontWeight: FontWeight.w700,
+          color: AppColors.white,
+        ),
+        brightness: Brightness.light,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.background,
+        modalBackgroundColor: AppColors.background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+        ),
+      ),
     );
   }
 
@@ -252,6 +286,40 @@ class AppTheme {
         color: AppColors.darkBorder,
         thickness: 1.5,
         space: 24,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.darkSoftPurple,
+        disabledColor: AppColors.darkBorder,
+        selectedColor: accentColor,
+        secondarySelectedColor: accentColor,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        labelStyle: GoogleFonts.nunito(
+          fontWeight: FontWeight.w700,
+          color: AppColors.darkSoftPurpleText,
+        ),
+        secondaryLabelStyle: GoogleFonts.nunito(
+          fontWeight: FontWeight.w700,
+          color: AppColors.white,
+        ),
+        brightness: Brightness.dark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.darkBorder, width: 1.5),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.darkBackground,
+        modalBackgroundColor: AppColors.darkBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.darkSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: const BorderSide(color: AppColors.darkBorder, width: 1.5),
+        ),
       ),
     );
   }

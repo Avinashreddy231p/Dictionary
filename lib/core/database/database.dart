@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import '../../data/models/lexical_entry.dart';
 import '../utils/fuzzy_search.dart';
 
 part 'database.g.dart';
@@ -327,6 +328,133 @@ class AppDatabase extends _$AppDatabase {
     await delete(recentSearches).go();
   }
 
+  // --- Offline Backup Dictionary Queries & Utilities ---
+  Future<LexicalEntry?> getOfflineWord(String query) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return null;
+
+    final wordRow = await (select(words)..where((t) => t.word.equals(cleanQuery))).getSingleOrNull();
+    if (wordRow == null) return null;
+
+    final defRows = await (select(definitions)..where((t) => t.wordId.equals(wordRow.id))).get();
+
+    final senses = defRows.map((d) {
+      return Sense(
+        senseNumber: d.senseNumber ?? '1',
+        definition: d.definition,
+        examples: [],
+        labels: d.labels?.split(',').map((e) => e.trim()).toList() ?? [],
+      );
+    }).toList();
+
+    final mainDef = wordRow.simpleMeaning ?? (senses.isNotEmpty ? senses.first.definition : 'No offline definition available.');
+
+    return LexicalEntry(
+      core: CoreData(
+        headword: wordRow.word,
+        homograph: 0,
+        partOfSpeech: wordRow.partOfSpeech ?? 'word',
+        phonetic: wordRow.phonetic ?? '',
+        audioUrl: '',
+        syllables: wordRow.syllables?.split('*') ?? [wordRow.word],
+      ),
+      senses: senses.isNotEmpty
+          ? senses
+          : [
+              Sense(
+                senseNumber: '1',
+                definition: mainDef,
+                examples: [],
+                labels: [],
+              )
+            ],
+      grammar: GrammarData(
+        verbDivision: '',
+        usageNotes: [],
+        inflections: [],
+        relatedForms: [],
+      ),
+      linguistic: LinguisticData(
+        etymology: wordRow.etymology ?? 'Offline English Dictionary Dataset',
+        firstKnownUse: wordRow.firstKnownUse ?? '',
+      ),
+      lexiLens: LexiLensLayer(
+        simpleMeaning: mainDef,
+        contextualMeaning: wordRow.contextualMeaning ?? 'Offline backup dictionary definition.',
+        synonyms: [],
+        antonyms: [],
+      ),
+    );
+  }
+
+  Future<List<LexicalEntry>> searchOfflineWordsFuzzy(String query) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return [];
+
+    final wordRows = await (select(words)
+      ..where((t) => t.word.like('%$cleanQuery%'))
+      ..limit(8)).get();
+
+    final results = <LexicalEntry>[];
+    for (final row in wordRows) {
+      final entry = await getOfflineWord(row.word);
+      if (entry != null) results.add(entry);
+    }
+    return results;
+  }
+
+  Future<int> getOfflineWordsCount() async {
+    final result = await select(words).get();
+    return result.length;
+  }
+
+  Stream<int> watchOfflineWordsCount() {
+    return select(words).watch().map((list) => list.length);
+  }
+
+  Future<int> batchInsertOfflineWords(
+    List<({String word, String? pos, String definition})> entries, {
+    void Function(double progress)? onProgress,
+  }) async {
+    int insertedCount = 0;
+    const chunkSize = 250;
+    final total = entries.length;
+
+    for (int i = 0; i < total; i += chunkSize) {
+      final end = (i + chunkSize < total) ? i + chunkSize : total;
+      final chunk = entries.sublist(i, end);
+
+      await transaction(() async {
+        for (final entry in chunk) {
+          final wordClean = entry.word.toLowerCase();
+
+          final wordId = await into(words).insertOnConflictUpdate(
+            WordsCompanion.insert(
+              word: wordClean,
+              partOfSpeech: Value(entry.pos),
+              simpleMeaning: Value(entry.definition),
+            ),
+          );
+
+          await into(definitions).insert(
+            DefinitionsCompanion.insert(
+              wordId: wordId,
+              definition: entry.definition,
+              senseNumber: const Value('1'),
+            ),
+          );
+          insertedCount++;
+        }
+      });
+
+      if (onProgress != null) {
+        onProgress((end / total).clamp(0.0, 1.0));
+      }
+    }
+
+    return insertedCount;
+  }
+
   // --- Initial Database Seed with rich real data ---
   Future<void> seedDatabase() async {
     final count = await select(savedWords).get().then((v) => v.length);
@@ -453,6 +581,24 @@ class AppDatabase extends _$AppDatabase {
       await addWordToCollection(ieltsColId, w4);
       await addWordToCollection(hpColId, w5);
       await addWordToCollection(ieltsColId, w6);
+    }
+
+    // Seed Offline Backup Dictionary starter entries if empty
+    final offlineCount = await getOfflineWordsCount();
+    if (offlineCount == 0) {
+      await batchInsertOfflineWords([
+        (word: 'aam', pos: 'n.', definition: 'A Dutch and German measure of liquids, varying in different cities.'),
+        (word: 'aardvark', pos: 'n.', definition: 'An African burrowing nocturnal mammal (Orycteropus afer) that feeds on ants and termites.'),
+        (word: 'abacus', pos: 'n.', definition: 'An instrument for performing arithmetical calculations by sliding counters along rods.'),
+        (word: 'abate', pos: 'v. t.', definition: 'To bring down or reduce from a higher to a lower state, degree, or intensity.'),
+        (word: 'abandon', pos: 'v. t.', definition: 'To give up completely; to desert or forsake.'),
+        (word: 'reluctant', pos: 'a.', definition: 'Unwilling and hesitant; disinclined to action.'),
+        (word: 'bohemian', pos: 'n.', definition: 'A person who lives an unconventional, artistic lifestyle.'),
+        (word: 'ephemeral', pos: 'a.', definition: 'Lasting for a very short time; transitory; fleeting.'),
+        (word: 'serene', pos: 'a.', definition: 'Calm, peaceful, and untroubled; tranquil.'),
+        (word: 'quintessential', pos: 'a.', definition: 'Representing the most perfect or typical example of a quality or class.'),
+        (word: 'resilient', pos: 'a.', definition: 'Able to withstand or recover quickly from difficult conditions.'),
+      ]);
     }
   }
 }

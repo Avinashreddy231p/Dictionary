@@ -1315,7 +1315,16 @@ class SettingsScreen extends ConsumerWidget {
               'Offline Dictionary Database',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
-            subtitle: const Text('12.4 MB downloaded • Offline lookup active'),
+            subtitle: Consumer(
+              builder: (context, ref, child) {
+                final countAsync = ref.watch(offlineWordsCountStreamProvider);
+                return countAsync.when(
+                  data: (count) => Text('$count words indexed • Offline lookup active'),
+                  loading: () => const Text('Offline lookup active'),
+                  error: (_, __) => const Text('Offline lookup active'),
+                );
+              },
+            ),
             trailing: Switch.adaptive(
               value: settings.offlineDatabaseEnabled,
               activeColor: primaryColor,
@@ -1327,6 +1336,24 @@ class SettingsScreen extends ConsumerWidget {
                 );
               },
             ),
+          ),
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: primaryColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(CupertinoIcons.arrow_2_circlepath,
+                  color: primaryColor, size: 20),
+            ),
+            title: const Text(
+              'Sync Full English Dictionary CSV',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            subtitle: const Text('Download 100k+ words dataset from GitHub'),
+            onTap: () => _syncOfflineDatabase(context, ref),
           ),
           const Divider(height: 1, indent: 20, endIndent: 20),
           ListTile(
@@ -1702,6 +1729,70 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+
+void _syncOfflineDatabase(BuildContext context, WidgetRef ref) async {
+    double progress = 0.0;
+    StateSetter? dialogSetState;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulWidget(
+          builder: (context, setState) {
+            dialogSetState = setState;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: const Row(
+                children: [
+                  Icon(CupertinoIcons.cloud_download, color: Colors.blueAccent),
+                  SizedBox(width: 10),
+                  Text('Syncing Dataset', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAlignment.start,
+                children: [
+                  const Text('Downloading English Dictionary CSV dataset from GitHub and populating offline database...'),
+                  const SizedBox(height: 16),
+                  LinearProgressIndicator(
+                    value: progress > 0 ? progress : null,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  const SizedBox(height: 10),
+                  Text('${(progress * 100).toStringAsFixed(0)}% indexed', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    try {
+      final service = ref.read(offlineDictionaryServiceProvider);
+      final count = await service.downloadAndSyncDatabase(
+        onProgress: (p) {
+          if (dialogSetState != null) {
+            dialogSetState!(() {
+              progress = p;
+            });
+          }
+        },
+      );
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _showFeedback(context, 'Synced! $count words now available offline.');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _showFeedback(context, 'Sync failed: $e');
+      }
+    }
+  }
+  }
 }
 
 class _GeminiSettingsCard extends ConsumerStatefulWidget {
@@ -1751,112 +1842,136 @@ class _GeminiSettingsCardState extends ConsumerState<_GeminiSettingsCard> {
     SettingsState settings,
     SettingsNotifier settingsNotifier,
   ) {
-    final models = [
-      {'id': 'gemini-2.0-flash', 'name': 'Gemini 2.0 Flash', 'desc': 'Recommended • Next-gen speed & intelligence'},
-      {'id': 'gemini-1.5-flash', 'name': 'Gemini 1.5 Flash', 'desc': 'Fast & lightweight for daily lookups'},
-      {'id': 'gemini-1.5-pro', 'name': 'Gemini 1.5 Pro', 'desc': 'Deep reasoning & complex nuance analysis'},
-    ];
+    final geminiService = ref.read(geminiServiceProvider);
+    final apiKey = settings.geminiApiKey;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: widget.isDark ? const Color(0xFF1D1D2C) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(
-              color: widget.isDark ? const Color(0xFF2C2C3F) : AppColors.border,
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: widget.isDark ? Colors.white24 : Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+        return FutureBuilder<List<GeminiModelInfo>>(
+          future: geminiService.fetchAvailableModels(apiKey: apiKey),
+          builder: (context, snapshot) {
+            final isLoading = snapshot.connectionState == ConnectionState.waiting;
+            final models = snapshot.data ?? geminiService.getDefaultModels();
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.75,
+              ),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: widget.isDark ? const Color(0xFF1D1D2C) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(
+                  color: widget.isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+                  width: 1.5,
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Select AI Model',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              Column(
-                children: models.map((m) {
-                  final isSelected = settings.geminiModel == m['id'];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        settingsNotifier.setGeminiModel(m['id']!);
-                        _showFeedback(context, 'Selected model: ${m['name']}');
-                      },
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
                       child: Container(
-                        padding: const EdgeInsets.all(16),
+                        width: 40,
+                        height: 5,
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? widget.primaryColor.withOpacity(0.12)
-                              : (widget.isDark ? const Color(0xFF27273C) : AppColors.background),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isSelected
-                                ? widget.primaryColor
-                                : (widget.isDark ? const Color(0xFF383852) : AppColors.border),
-                            width: isSelected ? 2 : 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    m['name']!,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                      color: isSelected
-                                          ? widget.primaryColor
-                                          : (widget.isDark ? Colors.white : AppColors.textPrimary),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    m['desc']!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: widget.isDark ? Colors.white60 : AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (isSelected)
-                              Icon(Icons.check_circle_rounded, color: widget.primaryColor, size: 20),
-                          ],
+                          color: widget.isDark ? Colors.white24 : Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Select AI Model',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        if (isLoading)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Column(
+                      children: models.map((m) {
+                        final isSelected = settings.geminiModel == m.id;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              settingsNotifier.setGeminiModel(m.id);
+                              _showFeedback(context, 'Selected model: ${m.name}');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? widget.primaryColor.withOpacity(0.12)
+                                    : (widget.isDark ? const Color(0xFF27273C) : AppColors.background),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? widget.primaryColor
+                                      : (widget.isDark ? const Color(0xFF383852) : AppColors.border),
+                                  width: isSelected ? 2 : 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          m.name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                            color: isSelected
+                                                ? widget.primaryColor
+                                                : (widget.isDark ? Colors.white : AppColors.textPrimary),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          m.description,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: widget.isDark ? Colors.white60 : AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Icon(Icons.check_circle_rounded, color: widget.primaryColor, size: 20),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -1867,12 +1982,11 @@ class _GeminiSettingsCardState extends ConsumerState<_GeminiSettingsCard> {
     final settings = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
 
-    String modelDisplayName = 'Gemini 2.0 Flash';
-    if (settings.geminiModel == 'gemini-1.5-flash') {
-      modelDisplayName = 'Gemini 1.5 Flash';
-    } else if (settings.geminiModel == 'gemini-1.5-pro') {
-      modelDisplayName = 'Gemini 1.5 Pro';
-    }
+    final rawModel = settings.geminiModel.replaceFirst('models/', '');
+    final modelDisplayName = rawModel
+        .split('-')
+        .map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : '')
+        .join(' ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2014,13 +2128,19 @@ class _GeminiSettingsCardState extends ConsumerState<_GeminiSettingsCard> {
                               setState(() => _isSaving = true);
                               await settingsNotifier.setGeminiApiKey(key);
                               final geminiService = ref.read(geminiServiceProvider);
-                              final success = await geminiService.testApiKey(key, model: settings.geminiModel);
+                              final testResult = await geminiService.testApiKey(key, model: settings.geminiModel);
                               setState(() => _isSaving = false);
                               if (context.mounted) {
-                                if (success) {
-                                  _showFeedback(context, 'Connected successfully to Gemini ${settings.geminiModel}! ✨');
+                                if (testResult.success) {
+                                  final activeModel = testResult.workingModel ?? settings.geminiModel;
+                                  if (testResult.workingModel != null && testResult.workingModel != settings.geminiModel) {
+                                    await settingsNotifier.setGeminiModel(testResult.workingModel!);
+                                  }
+                                  if (context.mounted) {
+                                    _showFeedback(context, 'Connected successfully to Gemini $activeModel! ✨');
+                                  }
                                 } else {
-                                  _showFeedback(context, 'Key Saved. Connection failed - please check Key.');
+                                  _showFeedback(context, testResult.errorMessage != null ? 'Connection failed: ${testResult.errorMessage}' : 'Key Saved. Connection failed - please check Key.');
                                 }
                               }
                             },
