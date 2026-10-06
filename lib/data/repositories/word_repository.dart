@@ -1,25 +1,41 @@
 import '../../core/database/database.dart';
+import '../models/dictionary_entry.dart';
+import '../services/merriam_webster_service.dart';
 
 class WordRepository {
   final AppDatabase _db;
-  
-  WordRepository(this._db);
-  
-  Future<List<Word>> searchWords(String query) async {
-    return _db.searchWords(query);
-  }
-  
-  Future<Word?> getWordDetails(String query) async {
-    final words = await _db.searchWords(query);
-    if (words.isNotEmpty) return words.first;
-    return null;
-  }
-  
-  Future<List<Definition>> getWordDefinitions(int wordId) async {
-    return (_db.select(_db.definitions)..where((t) => t.wordId.equals(wordId))).get();
-  }
-  
-  Future<List<Example>> getDefinitionExamples(int definitionId) async {
-    return (_db.select(_db.examples)..where((t) => t.definitionId.equals(definitionId))).get();
+  final MerriamWebsterService _service;
+
+  WordRepository(this._db, {MerriamWebsterService? service})
+      : _service = service ?? MerriamWebsterService();
+
+  Future<List<DictionaryEntry>> searchWord(String query) async {
+    try {
+      final apiResults = await _service.fetchWord(query);
+      if (apiResults.isNotEmpty) return apiResults;
+    } catch (_) {}
+
+    // Fallback to local database if API fails or returns no results
+    final saved = await _db.getSavedWordByWord(query);
+    if (saved != null) {
+      return [
+        DictionaryEntry(
+          word: saved.word,
+          partOfSpeech: saved.partOfSpeech ?? 'word',
+          phonetic: saved.phonetic ?? '',
+          syllables: saved.syllables?.split('*') ?? [saved.word],
+          meanings: [saved.meaning ?? 'Saved vocabulary word'],
+          examples: saved.example != null ? [saved.example!] : [],
+          synonyms: [],
+          antonyms: [],
+          inflections: [],
+          grammaticalInfo: [],
+          registers: [],
+          domains: [],
+          etymology: '',
+        )
+      ];
+    }
+    return [];
   }
 }

@@ -23,6 +23,9 @@ class DictionaryEntry {
 
   // Linguistic
   final String etymology;
+  
+  // Audio
+  final String audioUrl;
 
   DictionaryEntry({
     required this.word,
@@ -38,6 +41,7 @@ class DictionaryEntry {
     required this.registers,
     required this.domains,
     required this.etymology,
+    this.audioUrl = '',
   });
 
   factory DictionaryEntry.fromJson(Map<String, dynamic> json) {
@@ -54,8 +58,25 @@ class DictionaryEntry {
     final fl = json['fl'] ?? 'unknown';
 
     String phonetic = '';
+    String audioUrl = '';
     if (hwi != null && hwi['prs'] != null && (hwi['prs'] as List).isNotEmpty) {
-      phonetic = '/${cleanText(hwi['prs'][0]['mw'])}/';
+      final prs = hwi['prs'][0];
+      phonetic = '/${cleanText(prs['mw'])}/';
+      
+      if (prs['sound'] != null && prs['sound']['audio'] != null) {
+        final audioFile = prs['sound']['audio'] as String;
+        String dir = '';
+        if (audioFile.startsWith('bix')) {
+          dir = 'bix';
+        } else if (audioFile.startsWith('gg')) {
+          dir = 'gg';
+        } else if (RegExp(r'^[^a-zA-Z]').hasMatch(audioFile)) {
+          dir = 'number';
+        } else {
+          dir = audioFile[0];
+        }
+        audioUrl = 'https://media.merriam-webster.com/audio/prons/en/us/mp3/$dir/$audioFile.mp3';
+      }
     }
 
     // Meaning
@@ -144,6 +165,7 @@ class DictionaryEntry {
       registers: registers,
       domains: domains,
       etymology: etymology,
+      audioUrl: audioUrl,
     );
   }
 }

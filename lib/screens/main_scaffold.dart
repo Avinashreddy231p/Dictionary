@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../theme/app_colors.dart';
 
 class MainScaffold extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
@@ -10,21 +9,27 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          indicatorColor: AppColors.softYellow,
-          labelTextStyle: MaterialStateProperty.resolveWith((states) {
-            if (states.contains(MaterialState.selected)) {
-              return const TextStyle(
-                color: AppColors.textPrimary,
+          indicatorColor: isDark
+              ? primaryColor.withOpacity(0.25)
+              : primaryColor.withOpacity(0.15),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return TextStyle(
+                color: isDark ? Colors.white : primaryColor,
                 fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               );
             }
-            return const TextStyle(
-              color: AppColors.textSecondary,
+            return TextStyle(
+              color: isDark ? Colors.white54 : Colors.grey.shade600,
               fontSize: 12,
               fontWeight: FontWeight.w600,
             );
@@ -38,22 +43,25 @@ class MainScaffold extends StatelessWidget {
               initialLocation: index == navigationShell.currentIndex,
             );
           },
-          backgroundColor: AppColors.background,
+          backgroundColor: theme.scaffoldBackgroundColor,
           elevation: 0,
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(CupertinoIcons.search, color: AppColors.textSecondary),
-              selectedIcon: Icon(CupertinoIcons.search, color: AppColors.textPrimary),
+              icon: Icon(CupertinoIcons.search,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600),
+              selectedIcon: Icon(CupertinoIcons.search, color: primaryColor),
               label: 'Search',
             ),
             NavigationDestination(
-              icon: Icon(CupertinoIcons.book, color: AppColors.textSecondary),
-              selectedIcon: Icon(CupertinoIcons.book_fill, color: AppColors.textPrimary),
+              icon: Icon(CupertinoIcons.book,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600),
+              selectedIcon: Icon(CupertinoIcons.book_fill, color: primaryColor),
               label: 'Collections',
             ),
             NavigationDestination(
-              icon: Icon(CupertinoIcons.settings, color: AppColors.textSecondary),
-              selectedIcon: Icon(CupertinoIcons.settings_solid, color: AppColors.textPrimary),
+              icon: Icon(CupertinoIcons.settings,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600),
+              selectedIcon: Icon(CupertinoIcons.settings_solid, color: primaryColor),
               label: 'Settings',
             ),
           ],

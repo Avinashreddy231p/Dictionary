@@ -28,65 +28,345 @@ class Examples extends Table {
 }
 
 class SavedWords extends Table {
-  IntColumn get wordId => integer().references(Words, #id)();
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get word => text().unique()();
+  TextColumn get phonetic => text().nullable()();
+  TextColumn get partOfSpeech => text().nullable()();
+  TextColumn get meaning => text().nullable()();
+  TextColumn get example => text().nullable()();
+  TextColumn get syllables => text().nullable()();
+  TextColumn get cefr => text().nullable()();
   DateTimeColumn get dateAdded => dateTime()();
   TextColumn get contextSentence => text().nullable()();
   TextColumn get personalNote => text().nullable()();
-  IntColumn get reviewState => integer().withDefault(const Constant(0))(); 
-  
-  @override
-  Set<Column> get primaryKey => {wordId};
+  IntColumn get reviewState => integer().withDefault(const Constant(0))(); // 0 = Learning, 1 = Review, 2 = Known
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  TextColumn get source => text().nullable()();
 }
 
-@DriftDatabase(tables: [Words, Definitions, Examples, SavedWords])
+class Collections extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text()();
+  TextColumn get description => text().nullable()();
+  TextColumn get colorHex => text().withDefault(const Constant('0xFFE5D4FF'))();
+  TextColumn get iconName => text().nullable()();
+  BoolColumn get isSmart => boolean().withDefault(const Constant(false))();
+  TextColumn get smartType => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+}
+
+class CollectionWords extends Table {
+  IntColumn get collectionId => integer().references(Collections, #id, onDelete: KeyAction.cascade)();
+  IntColumn get savedWordId => integer().references(SavedWords, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get addedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {collectionId, savedWordId};
+}
+
+class RecentSearches extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get query => text().unique()();
+  DateTimeColumn get searchedAt => dateTime()();
+}
+
+@DriftDatabase(tables: [Words, Definitions, Examples, SavedWords, Collections, CollectionWords, RecentSearches])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
   int get schemaVersion => 1;
-  
-  // Future implementation of migrations and queries
-  Future<List<Word>> getAllWords() => select(words).get();
-  
-  Future<List<Word>> searchWords(String query) {
-    return (select(words)..where((t) => t.word.like('%$query%'))).get();
+
+  // --- Saved Words Queries & Streams ---
+  Stream<List<SavedWord>> watchAllSavedWords() {
+    return (select(savedWords)..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
   }
 
+  Stream<List<SavedWord>> watchRecentSavedWords({int limit = 20}) {
+    return (select(savedWords)
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])
+      ..limit(limit)).watch();
+  }
+
+  Stream<List<SavedWord>> watchFavorites() {
+    return (select(savedWords)
+      ..where((t) => t.isFavorite.equals(true))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchNeedsReview() {
+    return (select(savedWords)
+      ..where((t) => t.reviewState.isIn([0, 1]))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchWordsWithSource() {
+    return (select(savedWords)
+      ..where((t) => t.source.isNotNull() & t.source.isNotValue(''))
+      ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])).watch();
+  }
+
+  Future<SavedWord?> getSavedWordByWord(String word) {
+    return (select(savedWords)..where((t) => t.word.equals(word.toLowerCase()))).getSingleOrNull();
+  }
+
+  Stream<SavedWord?> watchSavedWordByWord(String word) {
+    return (select(savedWords)..where((t) => t.word.equals(word.toLowerCase()))).watchSingleOrNull();
+  }
+
+  Future<int> saveWord({
+    required String word,
+    String? phonetic,
+    String? partOfSpeech,
+    String? meaning,
+    String? example,
+    String? syllables,
+    String? cefr,
+    String? contextSentence,
+    String? personalNote,
+    String? source,
+    int reviewState = 0,
+    bool isFavorite = false,
+  }) async {
+    final existing = await getSavedWordByWord(word);
+    if (existing != null) {
+      return existing.id;
+    }
+    return into(savedWords).insert(SavedWordsCompanion.insert(
+      word: word.toLowerCase(),
+      phonetic: Value(phonetic),
+      partOfSpeech: Value(partOfSpeech),
+      meaning: Value(meaning),
+      example: Value(example),
+      syllables: Value(syllables),
+      cefr: Value(cefr),
+      dateAdded: DateTime.now(),
+      contextSentence: Value(contextSentence),
+      personalNote: Value(personalNote),
+      source: Value(source),
+      reviewState: Value(reviewState),
+      isFavorite: Value(isFavorite),
+    ));
+  }
+
+  Future<void> removeSavedWord(String word) async {
+    await (delete(savedWords)..where((t) => t.word.equals(word.toLowerCase()))).go();
+  }
+
+  Future<void> toggleFavorite(int savedWordId) async {
+    final word = await (select(savedWords)..where((t) => t.id.equals(savedWordId))).getSingleOrNull();
+    if (word != null) {
+      await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
+        SavedWordsCompanion(isFavorite: Value(!word.isFavorite)),
+      );
+    }
+  }
+
+  Future<void> updateReviewState(int savedWordId, int state) async {
+    await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
+      SavedWordsCompanion(reviewState: Value(state)),
+    );
+  }
+
+  // --- Collections Queries & Streams ---
+  Stream<List<Collection>> watchUserCollections() {
+    return (select(collections)
+      ..where((t) => t.isSmart.equals(false))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
+  }
+
+  Stream<List<SavedWord>> watchWordsForCollection(int collectionId) {
+    final query = select(savedWords).join([
+      innerJoin(collectionWords, collectionWords.savedWordId.equalsExp(savedWords.id)),
+    ])..where(collectionWords.collectionId.equals(collectionId));
+
+    return query.watch().map((rows) => rows.map((row) => row.readTable(savedWords)).toList());
+  }
+
+  Stream<List<int>> watchCollectionIdsForWord(int savedWordId) {
+    final query = select(collectionWords)..where((t) => t.savedWordId.equals(savedWordId));
+    return query.watch().map((rows) => rows.map((r) => r.collectionId).toList());
+  }
+
+  Future<int> createCollection({
+    required String title,
+    String? description,
+    String? colorHex,
+    String? iconName,
+  }) async {
+    return into(collections).insert(CollectionsCompanion.insert(
+      title: title,
+      description: Value(description),
+      colorHex: Value(colorHex ?? '0xFFE5D4FF'),
+      iconName: Value(iconName),
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> deleteCollection(int collectionId) async {
+    await (delete(collectionWords)..where((t) => t.collectionId.equals(collectionId))).go();
+    await (delete(collections)..where((t) => t.id.equals(collectionId))).go();
+  }
+
+  Future<void> addWordToCollection(int collectionId, int savedWordId) async {
+    await into(collectionWords).insertOnConflictUpdate(CollectionWordsCompanion.insert(
+      collectionId: collectionId,
+      savedWordId: savedWordId,
+      addedAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> removeWordFromCollection(int collectionId, int savedWordId) async {
+    await (delete(collectionWords)
+      ..where((t) => t.collectionId.equals(collectionId) & t.savedWordId.equals(savedWordId))).go();
+  }
+
+  // --- Recent Searches ---
+  Stream<List<String>> watchRecentSearches({int limit = 10}) {
+    return (select(recentSearches)
+      ..orderBy([(t) => OrderingTerm.desc(t.searchedAt)])
+      ..limit(limit))
+      .watch()
+      .map((list) => list.map((item) => item.query).toList());
+  }
+
+  Future<void> addRecentSearch(String query) async {
+    final cleanQuery = query.trim().toLowerCase();
+    if (cleanQuery.isEmpty) return;
+    await into(recentSearches).insertOnConflictUpdate(RecentSearchesCompanion.insert(
+      query: cleanQuery,
+      searchedAt: DateTime.now(),
+    ));
+  }
+
+  Future<void> clearRecentSearches() async {
+    await delete(recentSearches).go();
+  }
+
+  // --- Initial Database Seed with rich real data ---
   Future<void> seedDatabase() async {
-    final count = await select(words).get().then((v) => v.length);
+    final count = await select(savedWords).get().then((v) => v.length);
     if (count == 0) {
-      final wordId = await into(words).insert(WordsCompanion(
-        word: const Value('reluctant'),
-        pronunciation: const Value('/ rɪˈlʌktənt /'),
-        cefr: const Value('B2'),
-        partOfSpeech: const Value('adjective'),
-      ));
+      // Seed Collections
+      final gatsbyColId = await createCollection(
+        title: 'The Great Gatsby',
+        description: 'Key vocabulary encountered while reading Chapter 3',
+        colorHex: '0xFFE5D4FF',
+      );
+      final forgetColId = await createCollection(
+        title: 'Words I Keep Forgetting',
+        description: 'Tricky advanced terms needing extra repetition',
+        colorHex: '0xFFD4F5E9',
+      );
+      final ieltsColId = await createCollection(
+        title: 'IELTS Vocabulary',
+        description: 'Band 8+ academic words for speaking and writing',
+        colorHex: '0xFFFFE2D4',
+      );
+      final hpColId = await createCollection(
+        title: 'Harry Potter',
+        description: 'Magical and literary descriptions',
+        colorHex: '0xFFD4E3FF',
+      );
 
-      final defId = await into(definitions).insert(DefinitionsCompanion(
-        wordId: Value(wordId),
-        meaning: const Value('Not wanting to do something.'),
-        simpleEnglish: const Value('You don\'t really want to do it, but you may do it anyway.'),
-      ));
+      // Seed Saved Words
+      final w1 = await saveWord(
+        word: 'reluctant',
+        phonetic: '/ rɪˈlʌktənt /',
+        partOfSpeech: 'adjective',
+        meaning: 'Not wanting to do something; feeling or showing hesitation.',
+        example: 'She was reluctant to leave the warm fireplace.',
+        syllables: 're*luc*tant',
+        cefr: 'B2',
+        source: 'The Great Gatsby',
+        contextSentence: 'He was reluctant to enter the room, even though he knew it was important.',
+        reviewState: 0,
+        isFavorite: true,
+      );
 
-      await into(examples).insert(ExamplesCompanion(
-        definitionId: Value(defId),
-        sentence: const Value('She was reluctant to leave.'),
-      ));
+      final w2 = await saveWord(
+        word: 'bohemian',
+        phonetic: '/ boʊˈhiːmiən /',
+        partOfSpeech: 'noun',
+        meaning: 'A person who lives an unconventional, artistic lifestyle.',
+        example: 'They lived a bohemian life in Paris during the 1920s.',
+        syllables: 'bo*he*mi*an',
+        cefr: 'C1',
+        source: 'The Great Gatsby',
+        contextSentence: 'The party attracted a colorful mix of bohemians and aristocrats.',
+        reviewState: 1,
+        isFavorite: false,
+      );
 
-      // Add a few more words
-      await into(words).insert(WordsCompanion(
-        word: const Value('bohemian'),
-        pronunciation: const Value('/ boʊˈhiːmiən /'),
-        cefr: const Value('C1'),
-        partOfSpeech: const Value('noun'),
-      ));
+      final w3 = await saveWord(
+        word: 'ephemeral',
+        phonetic: '/ ɪˈfɛmərəl /',
+        partOfSpeech: 'adjective',
+        meaning: 'Lasting for a very short time; fleeting.',
+        example: 'Fame in the digital age is often ephemeral.',
+        syllables: 'e*phem*er*al',
+        cefr: 'C2',
+        source: 'Words I Keep Forgetting',
+        contextSentence: 'The beauty of the cherry blossoms is poetic precisely because it is ephemeral.',
+        reviewState: 0,
+        isFavorite: true,
+      );
 
-      await into(words).insert(WordsCompanion(
-        word: const Value('ephemeral'),
-        pronunciation: const Value('/ ɪˈfɛmərəl /'),
-        cefr: const Value('C2'),
-        partOfSpeech: const Value('adjective'),
-      ));
+      final w4 = await saveWord(
+        word: 'serene',
+        phonetic: '/ sɪˈriːn /',
+        partOfSpeech: 'adjective',
+        meaning: 'Calm, peaceful, and untroubled; tranquil.',
+        example: 'The lake was serene in the early morning fog.',
+        syllables: 'se*rene',
+        cefr: 'B1',
+        source: 'IELTS Vocabulary',
+        contextSentence: 'Her serene expression reassured everyone in the crowded room.',
+        reviewState: 2,
+        isFavorite: true,
+      );
+
+      final w5 = await saveWord(
+        word: 'peculiar',
+        phonetic: '/ pɪˈkjuːliər /',
+        partOfSpeech: 'adjective',
+        meaning: 'Strange or odd; unusual.',
+        example: 'He gave her a peculiar look before leaving.',
+        syllables: 'pe*cu*li*ar',
+        cefr: 'B2',
+        source: 'Harry Potter',
+        contextSentence: 'There was a peculiar scratching sound coming from the cupboard.',
+        reviewState: 0,
+        isFavorite: false,
+      );
+
+      final w6 = await saveWord(
+        word: 'ambiguous',
+        phonetic: '/ æmˈbɪɡjuəs /',
+        partOfSpeech: 'adjective',
+        meaning: 'Open to more than one interpretation; not clear.',
+        example: 'The ending of the novel was intentionally ambiguous.',
+        syllables: 'am*big*u*ous',
+        cefr: 'B2',
+        source: 'IELTS Vocabulary',
+        contextSentence: 'His response was ambiguous, leaving us uncertain about his decision.',
+        reviewState: 1,
+        isFavorite: false,
+      );
+
+      // Link Words to Collections
+      await addWordToCollection(gatsbyColId, w1);
+      await addWordToCollection(gatsbyColId, w2);
+      await addWordToCollection(forgetColId, w3);
+      await addWordToCollection(ieltsColId, w4);
+      await addWordToCollection(ieltsColId, w6);
+      await addWordToCollection(hpColId, w5);
+
+      // Seed Recent Searches
+      await addRecentSearch('reluctant');
+      await addRecentSearch('peculiar');
+      await addRecentSearch('ambiguous');
+      await addRecentSearch('serene');
     }
   }
 }

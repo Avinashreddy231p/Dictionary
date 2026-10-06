@@ -1,31 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'core/providers/settings_provider.dart';
 import 'theme/app_theme.dart';
 import 'routing/app_router.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+
   runApp(
-    const ProviderScope(
-      child: LexiLensApp(),
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const LexiLensApp(),
     ),
   );
 }
 
-class LexiLensApp extends StatelessWidget {
+class LexiLensApp extends ConsumerWidget {
   const LexiLensApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+
     return MaterialApp.router(
       title: 'LexiLens',
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.getLight(settings.accentColor),
+      darkTheme: AppTheme.getDark(settings.accentColor),
+      themeMode: settings.themeMode,
       debugShowCheckedModeBanner: false,
       routerConfig: goRouter,
       builder: (context, child) {
         ErrorWidget.builder = (FlutterErrorDetails errorDetails) {
           return CustomErrorScreen(errorDetails: errorDetails);
         };
-        return child!;
+        final mediaQueryData = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQueryData.copyWith(
+            textScaler: TextScaler.linear(settings.fontScale),
+          ),
+          child: child!,
+        );
       },
     );
   }
@@ -55,15 +73,15 @@ class CustomErrorScreen extends StatelessWidget {
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Exception:',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(errorDetails.exceptionAsString()),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               'Stacktrace:',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(errorDetails.stack?.toString() ?? 'No stack trace available'),
           ],

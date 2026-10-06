@@ -1,17 +1,185 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/database/database.dart';
+import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
+import '../../data/models/dictionary_entry.dart';
+import '../collections/collection_detail_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  void _showAddWordDialog(BuildContext context) {
+    final wordController = TextEditingController();
+    final meaningController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Add Custom Word'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: wordController,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Word',
+                hintText: 'e.g. ubiquitous',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: meaningController,
+              decoration: InputDecoration(
+                labelText: 'Definition',
+                hintText: 'e.g. Present, appearing, or found everywhere',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.textPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            onPressed: () async {
+              final word = wordController.text.trim();
+              if (word.isNotEmpty) {
+                Navigator.pop(ctx);
+                final db = ref.read(databaseProvider);
+                final repo = ref.read(wordRepositoryProvider);
+                final results = await repo.searchWord(word);
+                final entry = results.isNotEmpty ? results.first : null;
+
+                await db.saveWord(
+                  word: word,
+                  phonetic: entry?.phonetic,
+                  partOfSpeech: entry?.partOfSpeech ?? 'word',
+                  meaning: meaningController.text.trim().isNotEmpty
+                      ? meaningController.text.trim()
+                      : (entry?.meanings.isNotEmpty == true ? entry!.meanings.first : 'Custom word'),
+                  example: entry?.examples.isNotEmpty == true ? entry!.examples.first : null,
+                  source: 'Manual Add',
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPasteTextDialog(BuildContext context) {
+    final textController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Paste Text to Extract Words'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Paste an article or snippet to save key vocabulary:'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: textController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Paste text here...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.textPrimary,
+              foregroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            onPressed: () async {
+              final text = textController.text.trim();
+              if (text.isNotEmpty) {
+                Navigator.pop(ctx);
+                final db = ref.read(databaseProvider);
+                final colId = await db.createCollection(
+                  title: 'Pasted Excerpt',
+                  description: text.length > 50 ? '${text.substring(0, 50)}...' : text,
+                  colorHex: '0xFFD4E3FF',
+                );
+
+                // Extract potential unique words
+                final words = text
+                    .replaceAll(RegExp(r'[^\w\s]'), '')
+                    .split(RegExp(r'\s+'))
+                    .where((w) => w.length > 4)
+                    .toSet()
+                    .take(5);
+
+                for (var w in words) {
+                  final savedId = await db.saveWord(
+                    word: w,
+                    meaning: 'Extracted from pasted excerpt',
+                    contextSentence: text,
+                    source: 'Pasted Excerpt',
+                  );
+                  await db.addWordToCollection(colId, savedId);
+                }
+
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CollectionDetailScreen(
+                        collectionId: colId,
+                        title: 'Pasted Excerpt',
+                        description: text,
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Create Collection'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -38,29 +206,33 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            const Icon(CupertinoIcons.sparkles, color: AppColors.textPrimary, size: 28),
+            Icon(CupertinoIcons.sparkles,
+                color: isDark ? Colors.white : AppColors.textPrimary, size: 28),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'LexiLens',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                         height: 1.1,
                       ),
                 ),
                 Text(
                   'Understand every word.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primaryPurple,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.primaryColor,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                 ),
               ],
@@ -73,8 +245,8 @@ class HomeScreen extends StatelessWidget {
           },
           icon: const Icon(CupertinoIcons.settings),
           style: IconButton.styleFrom(
-            backgroundColor: AppColors.white,
-            side: const BorderSide(color: AppColors.border, width: 1.5),
+            backgroundColor: theme.cardTheme.color,
+            side: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
           ),
         ),
       ],
@@ -82,6 +254,9 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeroSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -89,7 +264,7 @@ class HomeScreen extends StatelessWidget {
           flex: 3,
           child: Text(
             'Better\nWords,\nBigger\nStories.',
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
+            style: theme.textTheme.displayMedium?.copyWith(
                   height: 1.1,
                 ),
           ),
@@ -98,16 +273,19 @@ class HomeScreen extends StatelessWidget {
           flex: 2,
           child: Container(
             height: 120,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.softYellow,
+              color: AppColors.adaptiveSoftYellow(context),
+              border: isDark
+                  ? Border.all(color: AppColors.darkHeaderYellowText, width: 1.5)
+                  : null,
             ),
-            child: const Center(
+            child: Center(
               child: Icon(
                 CupertinoIcons.book_fill,
                 size: 48,
-                color: AppColors.primaryPurple,
-              ), // Placeholder for illustration
+                color: isDark ? AppColors.darkHeaderYellowText : theme.primaryColor,
+              ),
             ),
           ),
         ),
@@ -116,6 +294,9 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildSearchBar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () {
         context.go('/home/search');
@@ -123,31 +304,32 @@ class HomeScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(50),
-          border: Border.all(color: AppColors.border, width: 1.5),
+          border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
         ),
         child: Row(
           children: [
-            const Icon(CupertinoIcons.search, color: AppColors.textSecondary),
+            Icon(CupertinoIcons.search,
+                color: isDark ? Colors.white70 : AppColors.textSecondary),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Search a word or phrase...',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white60 : AppColors.textSecondary,
                     ),
               ),
             ),
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.textPrimary,
+              decoration: BoxDecoration(
+                color: theme.primaryColor,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 CupertinoIcons.arrow_right,
-                color: AppColors.white,
+                color: Colors.white,
                 size: 16,
               ),
             ),
@@ -158,7 +340,9 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildRecentSearches(BuildContext context) {
-    final recentWords = ['reluctant', 'peculiar', 'ambiguous', 'serene'];
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final recentSearchesAsync = ref.watch(recentSearchesStreamProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,113 +352,222 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text(
               'Recent Searches',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: theme.textTheme.titleMedium,
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () => context.go('/home/search'),
               child: Text(
                 'See all',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textPrimary,
+                style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.primaryColor,
+                      fontWeight: FontWeight.w800,
                     ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: recentWords.map((word) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Chip(
-                  label: Text(word),
-                  backgroundColor: AppColors.white,
-                  side: const BorderSide(color: AppColors.border, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textPrimary,
+        recentSearchesAsync.when(
+          data: (queries) {
+            final list = queries.isNotEmpty ? queries : ['reluctant', 'peculiar', 'ambiguous', 'serene'];
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: list.map((word) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: InkWell(
+                      onTap: () async {
+                        final repo = ref.read(wordRepositoryProvider);
+                        final results = await repo.searchWord(word);
+                        if (results.isNotEmpty && context.mounted) {
+                          context.push('/home/search/detail', extra: results.first);
+                        } else if (context.mounted) {
+                          context.go('/home/search');
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Chip(
+                        label: Text(word),
+                        backgroundColor: theme.cardTheme.color,
+                        side: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-              );
-            }).toList(),
-          ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            );
+          },
+          loading: () => const SizedBox(height: 40, child: CircularProgressIndicator()),
+          error: (_, __) => const SizedBox.shrink(),
         ),
       ],
     );
   }
 
   Widget _buildContinueReading(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: AppColors.continueReadingGradient,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final userColsAsync = ref.watch(userCollectionsStreamProvider);
+
+    return userColsAsync.when(
+      data: (cols) {
+        final activeCol = cols.isNotEmpty ? cols.first : null;
+        final title = activeCol?.title ?? 'The Great Gatsby';
+        final desc = activeCol?.description ?? 'Chapter 3 • Vocabulary reading';
+
+        return InkWell(
+          onTap: () {
+            if (activeCol != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CollectionDetailScreen(
+                    collectionId: activeCol.id,
+                    title: activeCol.title,
+                    description: activeCol.description,
+                  ),
+                ),
+              );
+            } else {
+              context.go('/collections');
+            }
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: isDark
+                  ? AppColors.continueReadingGradientDark
+                  : AppColors.continueReadingGradient,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: isDark ? const Color(0xFF4A3485) : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(CupertinoIcons.book, color: AppColors.textPrimary, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Continue Reading',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: AppColors.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(CupertinoIcons.book, color: Colors.white, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Continue Reading',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                                  color: Colors.white,
+                                ),
                           ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'The Great Gatsby',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.textPrimary,
+                        ],
                       ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Chapter 3 • 12 words looked up',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textPrimary,
+                      const SizedBox(height: 16),
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        desc,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white70,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: Colors.white24,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(CupertinoIcons.play_fill, color: Colors.white, size: 18),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
   Widget _buildQuickActions(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Quick Actions',
-          style: Theme.of(context).textTheme.titleMedium,
+          style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             _buildActionCard(
-                context, 'Scan Text', CupertinoIcons.camera, AppColors.softGreen),
+              context,
+              'Scan Text',
+              CupertinoIcons.camera,
+              isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
+              isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Camera text scanner ready.')),
+                );
+              },
+            ),
             _buildActionCard(
-                context, 'Import Book', CupertinoIcons.doc, AppColors.softPeach),
+              context,
+              'Import Book',
+              CupertinoIcons.doc,
+              isDark ? AppColors.darkSoftPink : AppColors.softPeach,
+              isDark ? AppColors.darkSoftPinkText : AppColors.textPrimary,
+              onTap: () {
+                _showAddWordDialog(context);
+              },
+            ),
             _buildActionCard(
-                context, 'Paste Text', CupertinoIcons.doc_on_clipboard, AppColors.softPurple),
+              context,
+              'Paste Text',
+              CupertinoIcons.doc_on_clipboard,
+              isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
+              isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
+              onTap: () {
+                _showPasteTextDialog(context);
+              },
+            ),
             _buildActionCard(
-                context, 'Add Word', CupertinoIcons.add, AppColors.softBlue),
+              context,
+              'Add Word',
+              CupertinoIcons.add,
+              isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
+              isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
+              onTap: () {
+                _showAddWordDialog(context);
+              },
+            ),
           ],
         ),
       ],
@@ -282,31 +575,44 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildActionCard(
-      BuildContext context, String title, IconData icon, Color color) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color bg,
+    Color textColor, {
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppColors.textPrimary),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ],
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(20),
+              border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: textColor),
+                const SizedBox(height: 8),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -314,6 +620,10 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildTodayVocabulary(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final savedWordsAsync = ref.watch(savedWordsStreamProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -322,58 +632,102 @@ class HomeScreen extends StatelessWidget {
           children: [
             Text(
               'Today\'s Vocabulary',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: theme.textTheme.titleMedium,
             ),
             TextButton(
-              onPressed: () {},
+              onPressed: () => context.go('/collections'),
               child: Text(
                 'See all',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textPrimary,
+                style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.primaryColor,
+                      fontWeight: FontWeight.w800,
                     ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppColors.border, width: 1.5),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
+        savedWordsAsync.when(
+          data: (words) {
+            final todayWord = words.isNotEmpty ? words.first : null;
+            final wordTitle = todayWord?.word ?? 'serene';
+            final posAndCefr = '${todayWord?.partOfSpeech ?? 'adjective'} • ${todayWord?.cefr ?? 'B1'}';
+
+            return InkWell(
+              onTap: () async {
+                final repo = ref.read(wordRepositoryProvider);
+                final results = await repo.searchWord(wordTitle);
+                if (results.isNotEmpty && context.mounted) {
+                  context.push('/home/search/detail', extra: results.first);
+                } else if (todayWord != null && context.mounted) {
+                  final fallbackEntry = DictionaryEntry(
+                    word: todayWord.word,
+                    partOfSpeech: todayWord.partOfSpeech ?? 'word',
+                    phonetic: todayWord.phonetic ?? '',
+                    syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
+                    meanings: [todayWord.meaning ?? 'Vocabulary word'],
+                    examples: todayWord.example != null ? [todayWord.example!] : [],
+                    synonyms: [],
+                    antonyms: [],
+                    inflections: [],
+                    grammaticalInfo: [],
+                    registers: [],
+                    domains: [],
+                    etymology: '',
+                  );
+                  context.push('/home/search/detail', extra: fallbackEntry);
+                }
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.softBlue,
-                  borderRadius: BorderRadius.circular(16),
+                  color: theme.cardTheme.color,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
                 ),
-                child: const Icon(CupertinoIcons.photo, color: AppColors.primaryPurple),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      'serene',
-                      style: Theme.of(context).textTheme.titleMedium,
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.photo,
+                        color: isDark ? AppColors.darkSoftBlueText : theme.primaryColor,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'adjective • B1',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            wordTitle,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            posAndCefr,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
+                    Icon(CupertinoIcons.chevron_right,
+                        color: isDark ? Colors.white70 : AppColors.textPrimary, size: 20),
                   ],
                 ),
               ),
-              const Icon(CupertinoIcons.chevron_right, color: AppColors.textPrimary, size: 20),
-            ],
-          ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, __) => const SizedBox.shrink(),
         ),
       ],
     );
