@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/database/database.dart';
+import '../../data/repositories/word_repository.dart';
 
 class WordDetailScreen extends ConsumerWidget {
   final String word;
@@ -132,7 +133,7 @@ class _DefinitionSection extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
