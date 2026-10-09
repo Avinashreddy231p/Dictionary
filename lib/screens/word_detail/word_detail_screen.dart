@@ -427,7 +427,6 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   void _showCreateNewCollectionDialog(BuildContext context, AppDatabase db, SavedWord savedWord) {
-  void _showCreateNewCollectionDialog(BuildContext context, AppDatabase db, SavedWord savedWord) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
