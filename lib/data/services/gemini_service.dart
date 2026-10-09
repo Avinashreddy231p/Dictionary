@@ -186,7 +186,7 @@ class GeminiService {
                 'contents': [
                   {
                     'parts': [
-                      {'text': prompt}
+                      {'text': 'Hello'}
                     ]
                   }
                 ]
@@ -474,7 +474,7 @@ class GeminiService {
                 'contents': [
                   {
                     'parts': [
-                      {'text': prompt}
+                      {'text': 'Hello'}
                     ]
                   }
                 ]

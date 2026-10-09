@@ -60,10 +60,19 @@ final indexingProgressProvider = NotifierProvider<IndexingProgressNotifier, Inde
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  // Ensure database is seeded on startup and pre-indexed offline dataset is verified
-  db.seedDatabase().then((_) async {
+  // Ensure database is seeded on startup and CSV dictionary dataset is auto-synced
+  db.seedDatabase().then((_) {
     final service = OfflineDictionaryService(db);
-    await service.autoSyncIfNeeded();
+    service.autoSyncIfNeeded(
+      onProgress: (p, count) {
+        ref.read(indexingProgressProvider.notifier).setIndexing(
+          isIndexing: p < 1.0,
+          progress: p,
+          count: count,
+          status: p < 1.0 ? 'Preparing pre-indexed Offline Dictionary Database...' : 'Offline Dictionary Ready!',
+        );
+      },
+    );
   });
   ref.onDispose(db.close);
   return db;
@@ -108,6 +117,11 @@ final searchFocusTriggerProvider = NotifierProvider<SearchFocusNotifier, int>(Se
 
 // Saved Words Providers
 final savedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchAllSavedWords();
+});
+
+final visitedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchAllSavedWords();
 });
@@ -173,13 +187,8 @@ final collectionIdsForWordStreamProvider = StreamProvider.family<List<int>, int>
   return db.watchCollectionIdsForWord(savedWordId);
 });
 
-// Recent Searches & Visited Words Provider
+// Recent Searches Provider
 final recentSearchesStreamProvider = StreamProvider<List<String>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchRecentSearches();
-});
-
-final visitedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.watchVisitedWords();
 });

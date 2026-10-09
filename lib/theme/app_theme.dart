@@ -100,33 +100,12 @@ class AppTheme {
       bg = const Color(0xFFF5F5F7); // Crisp white-grey
       cardColor = AppColors.white;
       textCol = const Color(0xFF111118);
-    } else if (variant == 'nordic') {
-      bg = const Color(0xFFF0F4F8); // Cool Nordic Ice Mist
-      cardColor = const Color(0xFFFFFFFF);
-      textCol = const Color(0xFF1E293B);
-    } else if (variant == 'matcha') {
-      bg = const Color(0xFFF2F7F2); // Soft Botanical Matcha Cream
-      cardColor = const Color(0xFFFFFFFF);
-      textCol = const Color(0xFF1B2A1E);
-    } else if (variant == 'rose') {
-      bg = const Color(0xFFFAF2F4); // Soft Rose Quartz Pink
-      cardColor = const Color(0xFFFFFFFF);
-      textCol = const Color(0xFF2B1A20);
-    } else if (variant == 'synth') {
-      bg = const Color(0xFFF7F2FA); // Soft Cyber Lilac Mist
-      cardColor = const Color(0xFFFFFFFF);
-      textCol = const Color(0xFF1E182A);
-    } else if (variant == 'accentTint' || variant == 'dynamic' || variant == 'accent') {
-      final hsl = HSLColor.fromColor(accentColor);
-      bg = hsl.withLightness(0.97).withSaturation(0.28).toColor();
-      cardColor = AppColors.white;
-      textCol = AppColors.textPrimary;
     }
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: bg,
+      scaffoldBackgroundColor: Colors.transparent,
       primaryColor: accentColor,
       colorScheme: ColorScheme.light(
         primary: accentColor,

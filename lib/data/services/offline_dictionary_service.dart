@@ -10,13 +10,22 @@ class OfflineDictionaryService {
   OfflineDictionaryService(this._db);
 
   /// Ensures pre-indexed database is initialized.
-  Future<void> autoSyncIfNeeded() async {
+  Future<void> autoSyncIfNeeded({
+    void Function(double progress, int count)? onProgress,
+  }) async {
     try {
       final count = await _db.getOfflineWordsCount();
       if (count < 1000) {
+        onProgress?.call(0.1, count);
         await restoreFromBundledAsset();
+        final finalCount = await _db.getOfflineWordsCount();
+        onProgress?.call(1.0, finalCount);
+      } else {
+        onProgress?.call(1.0, count);
       }
-    } catch (_) {}
+    } catch (_) {
+      onProgress?.call(1.0, 0);
+    }
   }
 
   /// Restores the pre-indexed SQLite database directly from bundled asset 'assets/offline_dictionary.db.gz'.

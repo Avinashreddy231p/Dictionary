@@ -2,38 +2,29 @@ import 'package:flutter/material.dart';
 
 class BackgroundTextureWidget extends StatelessWidget {
   final String texture; // 'none', 'dots', 'grid', 'crosshatch'
-  final double opacity; // 0.1 to 1.0
   final Widget child;
+  final double opacity;
 
   const BackgroundTextureWidget({
     super.key,
     required this.texture,
-    this.opacity = 0.8,
     required this.child,
+    this.opacity = 0.5,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (texture == 'none' || texture.isEmpty || opacity <= 0.0) {
+    if (texture == 'none' || texture.isEmpty || opacity <= 0) {
       return child;
     }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final rawBgColor = theme.scaffoldBackgroundColor;
-    final bgColor = (rawBgColor == Colors.transparent || rawBgColor.alpha == 0)
-        ? theme.colorScheme.background
-        : rawBgColor;
-
-    // Direct dynamic mapping from opacity slider (0.1..1.0) to clear, dramatic alpha
-    final minAlpha = isDark ? 0.03 : 0.02;
-    final maxAlpha = isDark ? 0.32 : 0.28;
-    final effectiveOpacity = (minAlpha + (maxAlpha - minAlpha) * opacity.clamp(0.0, 1.0)).clamp(0.005, 1.0);
-
-    final patternColor = isDark
-        ? Colors.white.withOpacity(effectiveOpacity)
-        : Colors.black.withOpacity(effectiveOpacity);
+    final bgColor = theme.colorScheme.background;
+    final baseAlpha = isDark ? 0.24 : 0.16;
+    final patternColor = (isDark ? Colors.white : Colors.black)
+        .withOpacity((baseAlpha * opacity).clamp(0.0, 1.0));
 
     return Stack(
       children: [
@@ -78,11 +69,10 @@ class BackgroundTexturePainter extends CustomPainter {
     if (texture == 'dots') {
       final dotPaint = Paint()
         ..color = patternColor
-        ..isAntiAlias = true
         ..style = PaintingStyle.fill;
 
       const spacing = 22.0;
-      const dotRadius = 1.2;
+      const dotRadius = 1.3;
 
       for (double x = spacing / 2; x < size.width; x += spacing) {
         for (double y = spacing / 2; y < size.height; y += spacing) {

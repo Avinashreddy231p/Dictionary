@@ -6,6 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/database/database.dart';
 import '../../data/models/settings_state.dart';
 
+enum RestoreStrategy {
+  mergeSkip,
+  mergeUpdate,
+  replaceAll,
+}
+
 class BackupConfig {
   final bool includeSettings;
   final bool includeVocabulary;

@@ -335,7 +335,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     try {
       final boundary = cardBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        await SharePlus.instance.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+        await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
         return;
       }
 
@@ -350,14 +350,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       final file = File(filePath);
       await file.writeAsBytes(pngBytes);
 
-      await SharePlus.instance.share(
+      await Share.shareXFiles(
         [XFile(filePath)],
         text: shareCaption,
         subject: 'Word Card: ${entry.core.headword}',
       );
     } catch (e) {
       debugPrint('Error sharing card image: $e');
-      await SharePlus.instance.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+      await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
     }
   }
 

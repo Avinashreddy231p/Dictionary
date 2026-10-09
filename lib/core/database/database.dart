@@ -6,10 +6,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../data/models/lexical_entry.dart';
 import '../utils/fuzzy_search.dart';
+import '../providers/settings_provider.dart';
 
 part 'database.g.dart';
-
-enum RestoreStrategy { replaceAll, mergeUpdate, mergeSkip }
 
 // --- Drift Database Tables ---
 
@@ -210,46 +209,6 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
-  Future<int> batchSaveWords(List<SavedWordsCompanion> companions) async {
-    int inserted = 0;
-    await transaction(() async {
-      for (final c in companions) {
-        final wordStr = c.word.value.toLowerCase();
-        final existing = await getSavedWordByWord(wordStr);
-        if (existing == null) {
-          await into(savedWords).insert(c, mode: InsertMode.insertOrReplace);
-          inserted++;
-        }
-      }
-    });
-    return inserted;
-  }
-
-  Future<int> batchSaveWordsAndAddToCollection(
-    List<SavedWordsCompanion> companions,
-    int collectionId,
-  ) async {
-    int inserted = 0;
-    await transaction(() async {
-      for (final c in companions) {
-        final wordStr = c.word.value.toLowerCase();
-        var existing = await getSavedWordByWord(wordStr);
-        int savedWordId;
-        if (existing == null) {
-          savedWordId = await into(savedWords).insert(c, mode: InsertMode.insertOrReplace);
-          inserted++;
-        } else {
-          savedWordId = existing.id;
-        }
-
-        if (savedWordId > 0) {
-          await addWordToCollection(collectionId, savedWordId);
-        }
-      }
-    });
-    return inserted;
-  }
-
   Future<void> updatePersonalNote(int savedWordId, String note) async {
     await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
       SavedWordsCompanion(personalNote: Value(note)),
@@ -302,14 +261,8 @@ class AppDatabase extends _$AppDatabase {
     String? iconName,
     String? tags,
   }) async {
-    final cleanTitle = title.trim();
-    final existing = await (select(collections)..where((t) => t.title.lower().equals(cleanTitle.toLowerCase()))).get();
-    if (existing.isNotEmpty) {
-      return existing.first.id;
-    }
-
     return into(collections).insert(CollectionsCompanion.insert(
-      title: cleanTitle,
+      title: title,
       description: Value(description),
       colorHex: Value(colorHex ?? '0xFFE5D4FF'),
       iconName: Value(iconName ?? 'book'),
@@ -355,50 +308,13 @@ class AppDatabase extends _$AppDatabase {
       ..where((t) => t.collectionId.equals(collectionId) & t.savedWordId.equals(savedWordId))).go();
   }
 
-  // --- Recent Searches & Visited Words ---
+  // --- Recent Searches ---
   Stream<List<String>> watchRecentSearches({int limit = 10}) {
     return (select(recentSearches)
       ..orderBy([(t) => OrderingTerm.desc(t.searchedAt)])
       ..limit(limit))
       .watch()
       .map((list) => list.map((item) => item.query).toList());
-  }
-
-  Stream<List<SavedWord>> watchVisitedWords() {
-    final query = select(recentSearches).join([
-      leftOuterJoin(savedWords, savedWords.word.equalsExp(recentSearches.query.lower())),
-      leftOuterJoin(words, words.word.equalsExp(recentSearches.query.lower())),
-    ])..orderBy([OrderingTerm.desc(recentSearches.searchedAt)]);
-
-    return query.watch().map((rows) {
-      final List<SavedWord> list = [];
-      for (final row in rows) {
-        final saved = row.readTableOrNull(savedWords);
-        final recent = row.readTable(recentSearches);
-        if (saved != null) {
-          list.add(saved);
-        } else {
-          final dictWord = row.readTableOrNull(words);
-          list.add(
-            SavedWord(
-              id: -recent.id,
-              word: recent.query,
-              partOfSpeech: dictWord?.partOfSpeech ?? 'noun',
-              phonetic: dictWord?.phonetic ?? '',
-              meaning: dictWord?.simpleMeaning ?? 'Visited in dictionary',
-              example: null,
-              contextSentence: null,
-              personalNote: null,
-              source: 'Search History',
-              isFavorite: false,
-              reviewState: 0,
-              dateAdded: recent.searchedAt,
-            ),
-          );
-        }
-      }
-      return list;
-    });
   }
 
   Future<void> addRecentSearch(String query) async {
@@ -412,198 +328,6 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> clearRecentSearches() async {
     await delete(recentSearches).go();
-  }
-
-  // --- Export & Restore Methods ---
-  Future<Map<String, dynamic>> exportUserDatabase({
-    bool includeWords = true,
-    bool includeCollections = true,
-    bool includeHistory = true,
-    void Function(double, String)? onProgress,
-  }) async {
-    final Map<String, dynamic> data = {};
-
-    if (includeWords) {
-      onProgress?.call(0.1, 'Exporting Vocabulary...');
-      final wordsList = await select(savedWords).get();
-      data['savedWords'] = wordsList.map((w) => w.toJson()).toList();
-    }
-
-    if (includeCollections) {
-      onProgress?.call(0.3, 'Exporting Collections...');
-      final cols = await select(collections).get();
-      data['collections'] = cols.map((c) => c.toJson()).toList();
-
-      onProgress?.call(0.5, 'Exporting Collection Links...');
-      final links = await select(collectionWords).get();
-      data['collectionWords'] = links.map((l) => l.toJson()).toList();
-    }
-
-    if (includeHistory) {
-      onProgress?.call(0.7, 'Exporting History...');
-      final searches = await select(recentSearches).get();
-      data['recentSearches'] = searches.map((s) => s.toJson()).toList();
-    }
-
-    onProgress?.call(1.0, 'Database Export Complete');
-    return data;
-  }
-
-  Future<void> restoreUserDatabase(
-    Map<String, dynamic> data, {
-    RestoreStrategy wordStrategy = RestoreStrategy.mergeSkip,
-    RestoreStrategy collectionStrategy = RestoreStrategy.mergeSkip,
-    RestoreStrategy historyStrategy = RestoreStrategy.mergeSkip,
-    void Function(double, String)? onProgress,
-  }) async {
-    await transaction(() async {
-      // 1. Vocabulary Restore
-      if (data.containsKey('savedWords')) {
-        onProgress?.call(0.1, 'Restoring Vocabulary...');
-        final list = data['savedWords'] as List<dynamic>;
-        
-        if (wordStrategy == RestoreStrategy.replaceAll) {
-          await delete(savedWords).go();
-        }
-
-        int count = 0;
-        for (final item in list) {
-          final word = SavedWord.fromJson(item as Map<String, dynamic>);
-          final comp = word.toCompanion(false);
-          final existing = await getSavedWordByWord(word.word);
-          
-          if (wordStrategy == RestoreStrategy.replaceAll) {
-             await into(savedWords).insert(comp.copyWith(id: const Value.absent()), mode: InsertMode.insertOrReplace);
-          } else if (wordStrategy == RestoreStrategy.mergeUpdate) {
-             if (existing != null) {
-               await update(savedWords).replace(comp.copyWith(id: Value(existing.id)));
-             } else {
-               await into(savedWords).insert(comp.copyWith(id: const Value.absent()));
-             }
-          } else if (wordStrategy == RestoreStrategy.mergeSkip) {
-             if (existing == null) {
-               await into(savedWords).insert(comp.copyWith(id: const Value.absent()));
-             }
-          }
-          count++;
-          if (count % 50 == 0) {
-            onProgress?.call(0.1 + (0.3 * (count / list.length)), 'Restored $count words...');
-          }
-        }
-      }
-
-      // 2. Collections Restore
-      if (data.containsKey('collections') && data.containsKey('collectionWords')) {
-        onProgress?.call(0.4, 'Restoring Collections...');
-        final colList = data['collections'] as List<dynamic>;
-        final linksList = data['collectionWords'] as List<dynamic>;
-
-        if (collectionStrategy == RestoreStrategy.replaceAll) {
-          await delete(collectionWords).go();
-          await delete(collections).go();
-        }
-
-        // Keep track of old to new collection IDs for links mapping
-        final colIdMap = <int, int>{};
-        
-        int count = 0;
-        for (final item in colList) {
-          final col = Collection.fromJson(item as Map<String, dynamic>);
-          final comp = col.toCompanion(false);
-          final existingQuery = await (select(collections)..where((t) => t.title.lower().equals(col.title.toLowerCase()))).getSingleOrNull();
-          
-          int newId = -1;
-          if (collectionStrategy == RestoreStrategy.replaceAll) {
-             newId = await into(collections).insert(comp.copyWith(id: const Value.absent()));
-          } else if (collectionStrategy == RestoreStrategy.mergeUpdate) {
-             if (existingQuery != null) {
-                await update(collections).replace(comp.copyWith(id: Value(existingQuery.id)));
-                newId = existingQuery.id;
-             } else {
-                newId = await into(collections).insert(comp.copyWith(id: const Value.absent()));
-             }
-          } else if (collectionStrategy == RestoreStrategy.mergeSkip) {
-             if (existingQuery == null) {
-                newId = await into(collections).insert(comp.copyWith(id: const Value.absent()));
-             } else {
-                newId = existingQuery.id;
-             }
-          }
-          
-          if (newId != -1) {
-             colIdMap[col.id] = newId;
-          }
-          count++;
-        }
-
-        onProgress?.call(0.6, 'Restoring Collection Links...');
-        for (final item in linksList) {
-          final link = CollectionWord.fromJson(item as Map<String, dynamic>);
-          
-          // Map to new collection ID
-          final targetColId = colIdMap[link.collectionId];
-          if (targetColId == null) continue;
-          
-          // Only link words that currently exist in the database (since word IDs may have shifted or skipped)
-          final originalSavedWordId = link.savedWordId;
-          // In a robust system, we would need to map word IDs based on headword match.
-          // Since we didn't map word IDs, we must query the word by headword from the backup JSON to find the new local ID.
-          // This requires us to look back at data['savedWords'].
-          
-          final savedWordsList = data['savedWords'] as List<dynamic>? ?? [];
-          final backupWordData = savedWordsList.firstWhere(
-            (w) => w['id'] == originalSavedWordId, 
-            orElse: () => null
-          );
-          
-          if (backupWordData != null) {
-             final headword = backupWordData['word'] as String;
-             final currentWordRecord = await getSavedWordByWord(headword);
-             if (currentWordRecord != null) {
-                await into(collectionWords).insertOnConflictUpdate(
-                  CollectionWordsCompanion.insert(
-                    collectionId: targetColId,
-                    savedWordId: currentWordRecord.id,
-                    addedAt: link.addedAt,
-                  ),
-                );
-             }
-          }
-        }
-      }
-
-      // 3. History Restore
-      if (data.containsKey('recentSearches')) {
-        onProgress?.call(0.8, 'Restoring Search History...');
-        final historyList = data['recentSearches'] as List<dynamic>;
-
-        if (historyStrategy == RestoreStrategy.replaceAll) {
-          await delete(recentSearches).go();
-        }
-
-        for (final item in historyList) {
-          final search = RecentSearche.fromJson(item as Map<String, dynamic>);
-          final comp = search.toCompanion(false);
-          final existing = await (select(recentSearches)..where((t) => t.query.equals(search.query))).getSingleOrNull();
-
-          if (historyStrategy == RestoreStrategy.replaceAll) {
-             await into(recentSearches).insert(comp.copyWith(id: const Value.absent()));
-          } else if (historyStrategy == RestoreStrategy.mergeUpdate) {
-             if (existing != null) {
-               await update(recentSearches).replace(comp.copyWith(id: Value(existing.id)));
-             } else {
-               await into(recentSearches).insert(comp.copyWith(id: const Value.absent()));
-             }
-          } else if (historyStrategy == RestoreStrategy.mergeSkip) {
-             if (existing == null) {
-               await into(recentSearches).insert(comp.copyWith(id: const Value.absent()));
-             }
-          }
-        }
-      }
-      
-      onProgress?.call(1.0, 'Database Restore Complete');
-    });
   }
 
   // --- Offline Backup Dictionary Queries & Utilities ---
@@ -891,6 +615,203 @@ class AppDatabase extends _$AppDatabase {
     return insertedCount;
   }
 
+  Future<int> batchSaveWords(List<SavedWordsCompanion> companions) async {
+    int count = 0;
+    await transaction(() async {
+      for (final companion in companions) {
+        final existing = await getSavedWordByWord(companion.word.value);
+        if (existing == null) {
+          await into(savedWords).insert(companion, mode: InsertMode.insertOrIgnore);
+          count++;
+        }
+      }
+    });
+    return count;
+  }
+
+  Future<int> batchSaveWordsAndAddToCollection(List<SavedWordsCompanion> companions, int collectionId) async {
+    int count = 0;
+    await transaction(() async {
+      for (final companion in companions) {
+        final existing = await getSavedWordByWord(companion.word.value);
+        int savedWordId;
+        if (existing != null) {
+          savedWordId = existing.id;
+        } else {
+          savedWordId = await into(savedWords).insert(companion, mode: InsertMode.insertOrIgnore);
+          count++;
+        }
+        if (savedWordId > 0) {
+          await addWordToCollection(collectionId, savedWordId);
+        }
+      }
+    });
+    return count;
+  }
+
+  Future<Map<String, dynamic>> exportUserDatabase({
+    bool includeWords = true,
+    bool includeCollections = true,
+    bool includeHistory = true,
+    void Function(double, String)? onProgress,
+  }) async {
+    final Map<String, dynamic> result = {};
+
+    if (includeWords) {
+      onProgress?.call(0.2, 'Exporting Vocabulary...');
+      final wordsList = await select(savedWords).get();
+      result['saved_words'] = wordsList.map((w) => {
+        'word': w.word,
+        'phonetic': w.phonetic,
+        'partOfSpeech': w.partOfSpeech,
+        'meaning': w.meaning,
+        'example': w.example,
+        'syllables': w.syllables,
+        'cefr': w.cefr,
+        'dateAdded': w.dateAdded.toIso8601String(),
+        'contextSentence': w.contextSentence,
+        'personalNote': w.personalNote,
+        'reviewState': w.reviewState,
+        'isFavorite': w.isFavorite,
+        'source': w.source,
+      }).toList();
+    }
+
+    if (includeCollections) {
+      onProgress?.call(0.5, 'Exporting Collections...');
+      final collectionsList = await select(collections).get();
+      result['collections'] = collectionsList.map((c) => {
+        'id': c.id,
+        'title': c.title,
+        'description': c.description,
+        'colorHex': c.colorHex,
+        'iconName': c.iconName,
+        'tags': c.tags,
+        'isSmart': c.isSmart,
+        'smartType': c.smartType,
+        'createdAt': c.createdAt.toIso8601String(),
+      }).toList();
+
+      final collectionWordsList = await select(collectionWords).get();
+      result['collection_words'] = collectionWordsList.map((cw) => {
+        'collectionId': cw.collectionId,
+        'savedWordId': cw.savedWordId,
+        'addedAt': cw.addedAt.toIso8601String(),
+      }).toList();
+    }
+
+    if (includeHistory) {
+      onProgress?.call(0.8, 'Exporting Search History...');
+      final recentList = await select(recentSearches).get();
+      result['recent_searches'] = recentList.map((r) => {
+        'query': r.query,
+        'searchedAt': r.searchedAt.toIso8601String(),
+      }).toList();
+    }
+
+    return result;
+  }
+
+  Future<void> restoreUserDatabase(
+    Map<String, dynamic> payload, {
+    RestoreStrategy wordStrategy = RestoreStrategy.mergeSkip,
+    RestoreStrategy collectionStrategy = RestoreStrategy.mergeSkip,
+    RestoreStrategy historyStrategy = RestoreStrategy.mergeSkip,
+    void Function(double, String)? onProgress,
+  }) async {
+    await transaction(() async {
+      // 1. Restore Words
+      if (payload.containsKey('saved_words') && payload['saved_words'] is List) {
+        onProgress?.call(0.3, 'Restoring Vocabulary...');
+        final rawWords = payload['saved_words'] as List;
+
+        if (wordStrategy == RestoreStrategy.replaceAll) {
+          await delete(collectionWords).go();
+          await delete(savedWords).go();
+        }
+
+        for (final item in rawWords) {
+          if (item is! Map<String, dynamic>) continue;
+          final wordText = item['word']?.toString().toLowerCase();
+          if (wordText == null || wordText.isEmpty) continue;
+
+          final existing = await getSavedWordByWord(wordText);
+
+          final companion = SavedWordsCompanion.insert(
+            word: wordText,
+            phonetic: Value(item['phonetic']?.toString()),
+            partOfSpeech: Value(item['partOfSpeech']?.toString()),
+            meaning: Value(item['meaning']?.toString()),
+            example: Value(item['example']?.toString()),
+            syllables: Value(item['syllables']?.toString()),
+            cefr: Value(item['cefr']?.toString() ?? 'B2'),
+            dateAdded: DateTime.tryParse(item['dateAdded']?.toString() ?? '') ?? DateTime.now(),
+            contextSentence: Value(item['contextSentence']?.toString()),
+            personalNote: Value(item['personalNote']?.toString()),
+            source: Value(item['source']?.toString() ?? 'Backup'),
+            reviewState: Value((item['reviewState'] as num?)?.toInt() ?? 0),
+            isFavorite: Value(item['isFavorite'] == true),
+          );
+
+          if (existing == null) {
+            await into(savedWords).insert(companion, mode: InsertMode.insertOrIgnore);
+          } else if (wordStrategy == RestoreStrategy.mergeUpdate) {
+            await (update(savedWords)..where((t) => t.id.equals(existing.id))).write(companion);
+          }
+        }
+      }
+
+      // 2. Restore Collections
+      if (payload.containsKey('collections') && payload['collections'] is List) {
+        onProgress?.call(0.6, 'Restoring Collections...');
+        final rawCols = payload['collections'] as List;
+
+        if (collectionStrategy == RestoreStrategy.replaceAll) {
+          await delete(collectionWords).go();
+          await delete(collections).go();
+        }
+
+        for (final item in rawCols) {
+          if (item is! Map<String, dynamic>) continue;
+          final title = item['title']?.toString();
+          if (title == null || title.isEmpty) continue;
+
+          await into(collections).insert(
+            CollectionsCompanion.insert(
+              title: title,
+              description: Value(item['description']?.toString()),
+              colorHex: Value(item['colorHex']?.toString() ?? '0xFFE5D4FF'),
+              iconName: Value(item['iconName']?.toString() ?? 'book'),
+              tags: Value(item['tags']?.toString()),
+              isSmart: Value(item['isSmart'] == true),
+              smartType: Value(item['smartType']?.toString()),
+              createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+        }
+      }
+
+      // 3. Restore Search History
+      if (payload.containsKey('recent_searches') && payload['recent_searches'] is List) {
+        onProgress?.call(0.8, 'Restoring History...');
+        final rawHistory = payload['recent_searches'] as List;
+
+        if (historyStrategy == RestoreStrategy.replaceAll) {
+          await delete(recentSearches).go();
+        }
+
+        for (final item in rawHistory) {
+          if (item is! Map<String, dynamic>) continue;
+          final q = item['query']?.toString();
+          if (q != null && q.isNotEmpty) {
+            await addRecentSearch(q);
+          }
+        }
+      }
+    });
+  }
+
   // --- Initial Database Seed with rich real data ---
   Future<void> seedDatabase() async {
     final count = await select(savedWords).get().then((v) => v.length);
@@ -1064,18 +985,7 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'dictionary_v2.sqlite'));
-    
-    bool needsDecompress = !await file.exists();
-    if (!needsDecompress) {
-      try {
-        final length = await file.length();
-        if (length < 10000000) {
-          needsDecompress = true;
-        }
-      } catch (_) {}
-    }
-
-    if (needsDecompress) {
+    if (!await file.exists()) {
       try {
         final blob = await rootBundle.load('assets/offline_dictionary.db.gz');
         final compressedBytes = blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);

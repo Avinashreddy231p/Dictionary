@@ -79,7 +79,7 @@ class DictionaryRepository {
       try {
         var mwResult = await _service.fetchWord(cleanQuery);
         if (mwResult.entries.isNotEmpty) {
-          return await _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
+          return _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
         }
       } catch (_) {
         // Online API failed or offline
@@ -138,7 +138,7 @@ class DictionaryRepository {
         try {
           final altResult = await _service.fetchWord(noSpaces);
           if (altResult.entries.isNotEmpty) {
-            return await _enrichAndReturn(
+            return _enrichAndReturn(
               noSpaces,
               altResult.entries,
               altResult.suggestions,
@@ -155,7 +155,7 @@ class DictionaryRepository {
             try {
               final partResult = await _service.fetchWord(part);
               if (partResult.entries.isNotEmpty) {
-                return await _enrichAndReturn(
+                return _enrichAndReturn(
                   part,
                   partResult.entries,
                   partResult.suggestions,
@@ -213,7 +213,7 @@ class DictionaryRepository {
           try {
             final fuzzyMwResult = await _service.fetchWord(topMatch.word);
             if (fuzzyMwResult.entries.isNotEmpty) {
-              return await _enrichAndReturn(
+              return _enrichAndReturn(
                 topMatch.word,
                 fuzzyMwResult.entries,
                 rankedSuggestions.where((s) => s != topMatch.word).toList(),

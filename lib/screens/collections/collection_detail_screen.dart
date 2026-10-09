@@ -677,7 +677,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
       final file = File(filePath);
       await file.writeAsBytes(pngBytes);
 
-      await SharePlus.instance.share(
+      await Share.shareXFiles(
         [XFile(filePath)],
         text: 'Visual Poster Summary for $title (${words.length} words)',
         subject: '$title Vocabulary Card',
