@@ -208,6 +208,46 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
+  Future<int> batchSaveWords(List<SavedWordsCompanion> companions) async {
+    int inserted = 0;
+    await transaction(() async {
+      for (final c in companions) {
+        final wordStr = c.word.value.toLowerCase();
+        final existing = await getSavedWordByWord(wordStr);
+        if (existing == null) {
+          await into(savedWords).insert(c, mode: InsertMode.insertOrReplace);
+          inserted++;
+        }
+      }
+    });
+    return inserted;
+  }
+
+  Future<int> batchSaveWordsAndAddToCollection(
+    List<SavedWordsCompanion> companions,
+    int collectionId,
+  ) async {
+    int inserted = 0;
+    await transaction(() async {
+      for (final c in companions) {
+        final wordStr = c.word.value.toLowerCase();
+        var existing = await getSavedWordByWord(wordStr);
+        int savedWordId;
+        if (existing == null) {
+          savedWordId = await into(savedWords).insert(c, mode: InsertMode.insertOrReplace);
+          inserted++;
+        } else {
+          savedWordId = existing.id;
+        }
+
+        if (savedWordId > 0) {
+          await addWordToCollection(collectionId, savedWordId);
+        }
+      }
+    });
+    return inserted;
+  }
+
   Future<void> updatePersonalNote(int savedWordId, String note) async {
     await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
       SavedWordsCompanion(personalNote: Value(note)),
@@ -793,7 +833,18 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'dictionary_v2.sqlite'));
-    if (!await file.exists()) {
+    
+    bool needsDecompress = !await file.exists();
+    if (!needsDecompress) {
+      try {
+        final length = await file.length();
+        if (length < 10000000) {
+          needsDecompress = true;
+        }
+      } catch (_) {}
+    }
+
+    if (needsDecompress) {
       try {
         final blob = await rootBundle.load('assets/offline_dictionary.db.gz');
         final compressedBytes = blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);

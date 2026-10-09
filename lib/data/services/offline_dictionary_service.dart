@@ -1,122 +1,38 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../../core/database/database.dart';
 
 class OfflineDictionaryService {
   final AppDatabase _db;
-  static const String datasetCsvUrl =
-      'https://raw.githubusercontent.com/benjihillard/English-Dictionary-Database/refs/heads/main/english%20Dictionary.csv';
 
   OfflineDictionaryService(this._db);
 
-  /// Automatically syncs the offline database from local CSV file or asset if count is low (< 1000).
-  Future<void> autoSyncIfNeeded({
-    void Function(double progress, int count)? onProgress,
-  }) async {
+  /// Ensures pre-indexed database is initialized.
+  Future<void> autoSyncIfNeeded() async {
     try {
       final count = await _db.getOfflineWordsCount();
       if (count < 1000) {
-        await syncFromLocalOrRemote(onProgress: onProgress);
+        await restoreFromBundledAsset();
       }
     } catch (_) {}
   }
 
-  /// Attempts to load and index the dataset from local disk, Flutter assets, or HTTP download.
-  Future<int> syncFromLocalOrRemote({
-    void Function(double progress, int count)? onProgress,
-  }) async {
-    final currentCount = await _db.getOfflineWordsCount();
-    if (currentCount > 1000) return currentCount;
+  /// Restores the pre-indexed SQLite database directly from bundled asset 'assets/offline_dictionary.db.gz'.
+  Future<int> restoreFromBundledAsset() async {
+    try {
+      final blob = await rootBundle.load('assets/offline_dictionary.db.gz');
+      final compressedBytes = blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);
+      final decompressedBytes = GZipCodec().decode(compressedBytes);
 
-    // Fallback to HTTP download if asset copy didn't occur
-    return await downloadAndSyncDatabase(onProgress: onProgress);
-  }
+      final dbFolder = await getApplicationDocumentsDirectory();
+      final file = File(p.join(dbFolder.path, 'dictionary_v2.sqlite'));
 
-  /// Downloads the full English Dictionary CSV dataset from GitHub and syncs it to the local SQLite database.
-  Future<int> downloadAndSyncDatabase({
-    void Function(double progress, int count)? onProgress,
-  }) async {
-    final response = await http.get(Uri.parse(datasetCsvUrl));
-    if (response.statusCode == 200) {
-      return await importCsvString(response.body, onProgress: onProgress);
-    } else {
-      throw Exception('Failed to download dataset (HTTP ${response.statusCode})');
+      await file.writeAsBytes(decompressedBytes, flush: true);
+      return await _db.getOfflineWordsCount();
+    } catch (_) {
+      return 0;
     }
-  }
-
-  /// Parses CSV dataset text and batch-inserts words and definitions into the database.
-  Future<int> importCsvString(
-    String csvData, {
-    void Function(double progress, int count)? onProgress,
-  }) async {
-    final lines = const LineSplitter().convert(csvData);
-    if (lines.isEmpty) return 0;
-
-    final entries = <({String word, String? pos, String definition})>[];
-
-    // Skip header line [word, pos, definition]
-    for (int i = 1; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) continue;
-
-      final parsed = _parseCsvLine(line);
-      if (parsed != null) {
-        entries.add(parsed);
-      }
-    }
-
-    if (entries.isEmpty) return 0;
-
-    return await _db.batchInsertOfflineWords(entries, onProgress: onProgress);
-  }
-
-  /// Robust CSV line parser for [word, pos, definition] respecting quoted fields.
-  ({String word, String? pos, String definition})? _parseCsvLine(String line) {
-    final fields = <String>[];
-    final sb = StringBuffer();
-    bool inQuotes = false;
-
-    for (int i = 0; i < line.length; i++) {
-      final char = line[i];
-      if (char == '"') {
-        if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
-          sb.write('"');
-          i++; // skip escaped quote
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char == ',' && !inQuotes) {
-        fields.add(sb.toString().trim());
-        sb.clear();
-      } else {
-        sb.write(char);
-      }
-    }
-    fields.add(sb.toString().trim());
-
-    if (fields.length < 3) return null;
-
-    final word = _cleanQuotes(fields[0]);
-    final pos = _cleanQuotes(fields[1]);
-    final def = _cleanQuotes(fields[2]);
-
-    if (word.isEmpty || def.isEmpty) return null;
-
-    return (
-      word: word,
-      pos: pos.isNotEmpty ? pos : null,
-      definition: def,
-    );
-  }
-
-  String _cleanQuotes(String input) {
-    String str = input.trim();
-    if (str.startsWith('"') && str.endsWith('"') && str.length >= 2) {
-      str = str.substring(1, str.length - 1).replaceAll('""', '"').trim();
-    }
-    return str;
   }
 }

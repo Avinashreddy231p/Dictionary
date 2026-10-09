@@ -1,12 +1,18 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
 import '../../data/services/export_service.dart';
+import '../../data/services/file_import_service.dart';
 
 class CollectionDetailScreen extends ConsumerStatefulWidget {
   final int? collectionId;
@@ -367,7 +373,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     subtitle: const Text('Beautiful, shareable poster card with vocabulary list'),
                     onTap: () {
                       Navigator.pop(ctx);
-                      _showSharePosterCardModal(context, words, widget.title);
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        if (context.mounted) {
+                          _showSharePosterCardModal(context, words, widget.title);
+                        }
+                      });
                     },
                   ),
                   const Divider(height: 1),
@@ -385,15 +395,34 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     ),
                     title: const Text('Anki Flashcard Deck CSV (.csv)', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: const Text('Export & share as .csv file for Anki app'),
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(ctx);
-                      final csv = ExportService.exportToAnkiCsv(words);
-                      await ExportService.exportAndShareFile(
-                        context: context,
-                        filename: '${widget.title}_Anki.csv',
-                        content: csv,
-                        successMessage: 'Exported Anki Deck file (.csv)',
-                      );
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        if (context.mounted) {
+                          _showInnovativeExportProgressModal(
+                            context: context,
+                            fileTypeLabel: 'Anki CSV Deck',
+                            onGenerate: (updateProgress) async {
+                              updateProgress(0.20, 'Structuring Anki card CSV fields...');
+                              await Future.delayed(const Duration(milliseconds: 250));
+                              final csv = ExportService.exportToAnkiCsv(words);
+                              updateProgress(0.60, 'Writing .csv file to local storage...');
+                              await Future.delayed(const Duration(milliseconds: 250));
+                              updateProgress(0.95, 'Preparing system share sheet...');
+                              await Future.delayed(const Duration(milliseconds: 200));
+                              updateProgress(1.0, 'Complete!');
+                              if (context.mounted) {
+                                await ExportService.exportAndShareFile(
+                                  context: context,
+                                  filename: '${widget.title}_Anki.csv',
+                                  content: csv,
+                                  successMessage: 'Exported Anki Deck file (.csv)',
+                                );
+                              }
+                            },
+                          );
+                        }
+                      });
                     },
                   ),
                   const Divider(height: 1),
@@ -411,17 +440,33 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     ),
                     title: const Text('Printable PDF Study Document (.pdf)', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: const Text('Export & share as a real binary .pdf document file'),
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(ctx);
-                      final pdfBytes = await ExportService.generatePdfDocument(words, widget.title);
-                      if (context.mounted) {
-                        await ExportService.exportAndShareBytes(
-                          context: context,
-                          filename: '${widget.title}_StudySheet.pdf',
-                          bytes: pdfBytes,
-                          successMessage: 'Exported PDF Study Document (.pdf)',
-                        );
-                      }
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        if (context.mounted) {
+                          _showInnovativeExportProgressModal(
+                            context: context,
+                            fileTypeLabel: 'PDF Study Document',
+                            onGenerate: (updateProgress) async {
+                              updateProgress(0.15, 'Loading Noto Sans IPA Unicode fonts...');
+                              await Future.delayed(const Duration(milliseconds: 300));
+                              updateProgress(0.50, 'Building binary PDF page structures...');
+                              final pdfBytes = await ExportService.generatePdfDocument(words, widget.title);
+                              updateProgress(0.85, 'Writing .pdf file to local storage...');
+                              await Future.delayed(const Duration(milliseconds: 250));
+                              updateProgress(1.0, 'Complete!');
+                              if (context.mounted) {
+                                await ExportService.exportAndShareBytes(
+                                  context: context,
+                                  filename: '${widget.title}_StudySheet.pdf',
+                                  bytes: pdfBytes,
+                                  successMessage: 'Exported PDF Study Document (.pdf)',
+                                );
+                              }
+                            },
+                          );
+                        }
+                      });
                     },
                   ),
                   const Divider(height: 1),
@@ -439,15 +484,32 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     ),
                     title: const Text('Formatted Study Sheet Text (.txt)', style: TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: const Text('Export & share as .txt text file'),
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(ctx);
-                      final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
-                      await ExportService.exportAndShareFile(
-                        context: context,
-                        filename: '${widget.title}_Notes.txt',
-                        content: sheet,
-                        successMessage: 'Exported Study Sheet file (.txt)',
-                      );
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        if (context.mounted) {
+                          _showInnovativeExportProgressModal(
+                            context: context,
+                            fileTypeLabel: 'Study Sheet Document',
+                            onGenerate: (updateProgress) async {
+                              updateProgress(0.25, 'Formatting study notes layout...');
+                              await Future.delayed(const Duration(milliseconds: 250));
+                              final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
+                              updateProgress(0.70, 'Writing .txt file to local storage...');
+                              await Future.delayed(const Duration(milliseconds: 250));
+                              updateProgress(1.0, 'Complete!');
+                              if (context.mounted) {
+                                await ExportService.exportAndShareFile(
+                                  context: context,
+                                  filename: '${widget.title}_Notes.txt',
+                                  content: sheet,
+                                  successMessage: 'Exported Study Sheet file (.txt)',
+                                );
+                              }
+                            },
+                          );
+                        }
+                      });
                     },
                   ),
                 ],
@@ -459,10 +521,184 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
     );
   }
 
+  void _showInnovativeExportProgressModal({
+    required BuildContext context,
+    required String fileTypeLabel,
+    required Future<void> Function(void Function(double progress, String status) updateProgress) onGenerate,
+  }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
+    double currentProgress = 0.05;
+    String currentStatus = 'Initializing export engine...';
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            WidgetsBinding.instance.addPostFrameCallback((_) async {
+              if (currentProgress == 0.05) {
+                await onGenerate((progress, status) {
+                  if (ctx.mounted) {
+                    setSheetState(() {
+                      currentProgress = progress;
+                      currentStatus = status;
+                    });
+                  }
+                });
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                }
+              }
+            });
+
+            final pct = (currentProgress * 100).toInt().clamp(0, 100);
+
+            return Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.2),
+                          blurRadius: 16,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 28),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    'Generating $fileTypeLabel',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    currentStatus,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white70 : AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  Text(
+                    '$pct%',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: primaryColor,
+                      letterSpacing: -1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: LinearProgressIndicator(
+                      value: currentProgress,
+                      minHeight: 10,
+                      backgroundColor: isDark ? const Color(0xFF2B2B40) : const Color(0xFFE5D4FF),
+                      valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(CupertinoIcons.checkmark_seal_fill, size: 14, color: primaryColor),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Compiling document & assets',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: primaryColor),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _sharePosterCardImage(
+    BuildContext context,
+    GlobalKey boundaryKey,
+    String title,
+    List<SavedWord> words,
+  ) async {
+    try {
+      final boundary = boundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        final summary = ExportService.exportToFormattedStudySheet(words, title);
+        await ExportService.exportAndShareFile(
+          context: context,
+          filename: '${title}_PosterCard.txt',
+          content: summary,
+          successMessage: 'Exported Visual Poster Summary',
+        );
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      final pngBytes = byteData.buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      final cleanTitle = title.replaceAll(RegExp(r'[^\w.-]'), '_');
+      final filePath = '${tempDir.path}/${cleanTitle}_PosterCard.png';
+      final file = File(filePath);
+      await file.writeAsBytes(pngBytes);
+
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'Visual Poster Summary for $title (${words.length} words)',
+        subject: '$title Vocabulary Card',
+      );
+    } catch (_) {
+      final summary = ExportService.exportToFormattedStudySheet(words, title);
+      await ExportService.exportAndShareFile(
+        context: context,
+        filename: '${title}_PosterCard.txt',
+        content: summary,
+        successMessage: 'Exported Visual Poster Summary',
+      );
+    }
+  }
+
   void _showSharePosterCardModal(BuildContext context, List<SavedWord> words, String title) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
+    final posterBoundaryKey = GlobalKey();
 
     showModalBottomSheet(
       context: context,
@@ -505,115 +741,137 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // Poster Card Preview
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: primaryColor.withOpacity(0.4), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.15),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            title.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5,
-                              color: primaryColor,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: primaryColor.withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${words.length} Words',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: primaryColor),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      ...words.take(5).map((w) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
-                              Expanded(
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isDark ? Colors.white : AppColors.textPrimary,
-                                    ),
-                                    children: [
-                                      TextSpan(text: '${w.word}: ', style: const TextStyle(fontWeight: FontWeight.w900)),
-                                      TextSpan(text: w.meaning ?? 'Vocabulary word'),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                      if (words.length > 5) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '+ ${words.length - 5} more words in collection...',
-                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: primaryColor),
+                // Poster Card Preview wrapped in RepaintBoundary
+                RepaintBoundary(
+                  key: posterBoundaryKey,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: primaryColor.withOpacity(0.4), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.15),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
                       ],
-                    ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              title.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                color: primaryColor,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${words.length} Words',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: primaryColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        ...words.take(5).map((w) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
+                                Expanded(
+                                  child: RichText(
+                                    text: TextSpan(
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isDark ? Colors.white : AppColors.textPrimary,
+                                      ),
+                                      children: [
+                                        TextSpan(text: '${w.word}: ', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                        TextSpan(text: w.meaning ?? 'Vocabulary word'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        if (words.length > 5) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '+ ${words.length - 5} more words in collection...',
+                            style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: primaryColor),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      elevation: 2,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          elevation: 2,
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await _sharePosterCardImage(context, posterBoundaryKey, title, words);
+                        },
+                        icon: const Icon(CupertinoIcons.share, size: 18),
+                        label: const Text(
+                          'Share Card Image',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
+                      ),
                     ),
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      final summary = ExportService.exportToFormattedStudySheet(words, title);
-                      await ExportService.exportAndShareFile(
-                        context: context,
-                        filename: '${title}_PosterCard.txt',
-                        content: summary,
-                        successMessage: 'Exported Visual Poster Summary file',
-                      );
-                    },
-                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
-                    label: const Text(
-                      'Copy Visual Poster Summary',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final summary = ExportService.exportToFormattedStudySheet(words, title);
+                        await ExportService.exportAndShareFile(
+                          context: context,
+                          filename: '${title}_PosterCard.txt',
+                          content: summary,
+                          successMessage: 'Exported Visual Poster Summary file',
+                        );
+                      },
+                      icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
+                      label: const Text(
+                        'Copy Text',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),

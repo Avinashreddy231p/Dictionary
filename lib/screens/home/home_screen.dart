@@ -838,135 +838,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildIndexingProgressSection(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final indexingState = ref.watch(indexingProgressProvider);
-    final countAsync = ref.watch(offlineWordsCountStreamProvider);
-    final dbCount = countAsync.value ?? 0;
-    final currentCount = indexingState.count > dbCount
-        ? indexingState.count
-        : (dbCount > 0 ? dbCount : indexingState.count);
-
-    final isDone = currentCount >= 100000 || (indexingState.progress >= 0.99 && !indexingState.isIndexing);
-
-    // Hide section from HomeScreen when indexing is complete or not actively running
-    if (isDone || (!indexingState.isIndexing && currentCount > 10000)) {
-      return const SizedBox.shrink();
-    }
-
-    final progressVal = (indexingState.progress > 0 ? indexingState.progress : (currentCount / 100000.0)).clamp(0.02, 1.0);
-    final percentText = '${(progressVal * 100).toInt()}%';
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF3EDFF),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: theme.primaryColor.withOpacity(0.3),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.primaryColor.withOpacity(isDark ? 0.2 : 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  CupertinoIcons.arrow_2_circlepath,
-                  color: theme.primaryColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Indexing Offline Dictionary (14.5 MB)',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Preparing pre-indexed Offline Dictionary Database...',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.primaryColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  percentText,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progressVal,
-              minHeight: 8,
-              backgroundColor: isDark ? Colors.white12 : Colors.black12,
-              valueColor: AlwaysStoppedAnimation<Color>(theme.primaryColor),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Indexed: $currentCount / ~100,000 words',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                ),
-              ),
-              Text(
-                'Active in background',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                  color: theme.primaryColor,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildWordOfTheDay(BuildContext context) {
@@ -1609,20 +1481,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         return InkWell(
           onTap: () {
-            if (activeCol != null) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CollectionDetailScreen(
-                    collectionId: activeCol.id,
-                    title: activeCol.title,
-                    description: activeCol.description,
-                  ),
-                ),
-              );
-            } else {
-              context.go('/collections');
-            }
+            context.push('/reading');
           },
           borderRadius: BorderRadius.circular(20),
           child: Container(

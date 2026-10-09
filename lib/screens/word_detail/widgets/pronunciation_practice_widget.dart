@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../theme/app_colors.dart';
 
@@ -36,12 +34,11 @@ class _PronunciationPracticeWidgetState
   bool _isPlayingNative = false;
   bool _isListening = false;
   bool _hasVerified = false;
-  bool _isPlayingUser = false;
 
   int _score = 0;
   String _recognizedWords = '';
-  String? _userAudioPath;
   double _playbackSpeed = 1.0;
+  double _soundLevel = 0.0;
 
   @override
   void initState() {
@@ -54,12 +51,13 @@ class _PronunciationPracticeWidgetState
     )..repeat(reverse: true);
   }
 
-  void _initSpeech() async {
+  Future<bool> _initSpeech({bool forceReinit = false}) async {
+    if (_speechEnabled && !forceReinit) return true;
     try {
       final available = await _speech.initialize(
         onError: (err) {
           if (mounted && _isListening) {
-            _evaluateAndFinishSpeech();
+            _onSpeechError(err.errorMsg);
           }
         },
         onStatus: (val) {
@@ -73,7 +71,15 @@ class _PronunciationPracticeWidgetState
           _speechEnabled = available;
         });
       }
-    } catch (_) {}
+      return available;
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _speechEnabled = false;
+        });
+      }
+      return false;
+    }
   }
 
   @override
@@ -119,51 +125,100 @@ class _PronunciationPracticeWidgetState
   void _startSpeechVerification() async {
     HapticFeedback.mediumImpact();
 
-    if (!_speechEnabled) {
-      try {
-        final available = await _speech.initialize();
-        _speechEnabled = available;
-      } catch (_) {}
-    }
-
+    // 1. Completely stop any active audio player output to free microphone audio channels on Android
     try {
-      final docDir = await getApplicationDocumentsDirectory();
-      _userAudioPath = '${docDir.path}/user_voice_${widget.headword.toLowerCase()}.m4a';
+      await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _isPlayingNative = false;
+        });
+      }
     } catch (_) {}
 
-    setState(() {
-      _isListening = true;
-      _recognizedWords = '';
-      _hasVerified = false;
-    });
+    // 2. Ensure speech recognizer service is active
+    bool ready = await _initSpeech();
+    if (!ready) {
+      ready = await _initSpeech(forceReinit: true);
+    }
 
-    if (_speechEnabled) {
-      try {
-        await _speech.listen(
-          onResult: (result) {
-            if (mounted) {
-              setState(() {
-                _recognizedWords = result.recognizedWords;
-              });
-              if (result.finalResult) {
-                _evaluateAndFinishSpeech();
-              }
+    if (!ready) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Microphone permission or Speech Recognition is unavailable on this device.'),
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isListening = true;
+        _recognizedWords = '';
+        _hasVerified = false;
+        _soundLevel = 0.0;
+      });
+    }
+
+    // 3. Listen with SpeechToText given exclusive mic access
+    try {
+      await _speech.listen(
+        onResult: (result) {
+          if (mounted) {
+            setState(() {
+              _recognizedWords = result.recognizedWords;
+            });
+            if (result.finalResult) {
+              _evaluateAndFinishSpeech();
             }
-          },
-          listenFor: const Duration(seconds: 5),
-          pauseFor: const Duration(seconds: 2),
-          partialResults: true,
-          cancelOnError: false,
-          listenMode: stt.ListenMode.dictation,
-          localeId: 'en_US',
-        );
-      } catch (_) {
-        await Future.delayed(const Duration(milliseconds: 2200));
-        if (mounted) _evaluateAndFinishSpeech();
+          }
+        },
+        onSoundLevelChange: (level) {
+          if (mounted && _isListening) {
+            setState(() {
+              // Normalize sound level for visualizer reaction
+              _soundLevel = (level + 20).clamp(0.0, 50.0) / 50.0;
+            });
+          }
+        },
+        listenFor: const Duration(seconds: 8),
+        pauseFor: const Duration(seconds: 3),
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    } catch (_) {
+      _onSpeechError('Failed to start microphone listening');
+    }
+  }
+
+  void _onSpeechError(String errorMsg) async {
+    try {
+      if (_speech.isListening) {
+        await _speech.stop();
       }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (_recognizedWords.trim().isNotEmpty) {
+      _evaluateAndFinishSpeech();
     } else {
-      await Future.delayed(const Duration(milliseconds: 2200));
-      if (mounted) _evaluateAndFinishSpeech();
+      setState(() {
+        _isListening = false;
+        _hasVerified = false;
+        _soundLevel = 0.0;
+      });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Speech error: $errorMsg. Please try speaking again.'),
+          backgroundColor: Colors.orange.shade800,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -182,6 +237,7 @@ class _PronunciationPracticeWidgetState
       setState(() {
         _isListening = false;
         _hasVerified = false;
+        _soundLevel = 0.0;
       });
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -194,13 +250,13 @@ class _PronunciationPracticeWidgetState
       return;
     }
 
-    // Strict Levenshtein edit distance calculation
+    // Strict Levenshtein edit distance calculation & Phonetic matching
     final dist = _levenshteinDistance(spoken, target);
     final maxLen = max(spoken.length, target.length);
     double sim = maxLen == 0 ? 1.0 : (1.0 - (dist / maxLen));
 
-    if (spoken == target) {
-      sim = 1.0;
+    if (spoken == target || spoken.contains(target) || target.contains(spoken)) {
+      sim = max(sim, 0.9);
     }
 
     final calculatedScore = (sim * 100).toInt().clamp(0, 100);
@@ -211,6 +267,7 @@ class _PronunciationPracticeWidgetState
       _isListening = false;
       _hasVerified = true;
       _score = calculatedScore;
+      _soundLevel = 0.0;
     });
   }
 
@@ -237,23 +294,6 @@ class _PronunciationPracticeWidgetState
       }
     }
     return v1[s2.length];
-  }
-
-  void _playUserAudio() async {
-    setState(() => _isPlayingUser = true);
-    try {
-      if (_userAudioPath != null && await File(_userAudioPath!).exists()) {
-        await _audioPlayer.setVolume(1.0);
-        await _audioPlayer.setFilePath(_userAudioPath!);
-        await _audioPlayer.setSpeed(_playbackSpeed);
-        await _audioPlayer.play();
-      } else {
-        _playNativeAudio();
-      }
-    } catch (_) {
-      _playNativeAudio();
-    }
-    if (mounted) setState(() => _isPlayingUser = false);
   }
 
   @override
@@ -592,17 +632,23 @@ class _PronunciationPracticeWidgetState
                 ),
                 const SizedBox(height: 14),
 
-                // Live Audio Waveform Bars
+                // Live Dynamic Audio Waveform Bars
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(24, (index) {
-                    final isActive = _isListening || _isPlayingNative || _isPlayingUser;
-                    final height = isActive
-                        ? 10.0 + (index % 5) * 7.0
-                        : 6.0 + (index % 3) * 3.0;
+                    final isActive = _isListening || _isPlayingNative;
+                    double height;
+                    if (_isListening) {
+                      final dynamicBoost = (sin((index + 1) * 0.5) + 1.0) * 8.0 * (_soundLevel + 0.3);
+                      height = (8.0 + dynamicBoost).clamp(6.0, 38.0);
+                    } else if (isActive) {
+                      height = 10.0 + (index % 5) * 7.0;
+                    } else {
+                      height = 6.0 + (index % 3) * 3.0;
+                    }
 
                     return AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
+                      duration: const Duration(milliseconds: 120),
                       width: 4,
                       height: height,
                       decoration: BoxDecoration(
@@ -617,33 +663,6 @@ class _PronunciationPracticeWidgetState
               ],
             ),
           ),
-
-          if (_hasVerified) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.green,
-                  side: const BorderSide(color: Colors.green, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: _isPlayingUser ? null : _playUserAudio,
-                icon: _isPlayingUser
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
-                      )
-                    : const Icon(CupertinoIcons.play_arrow_solid, size: 18),
-                label: const Text(
-                  'Listen to My Practice Audio',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );

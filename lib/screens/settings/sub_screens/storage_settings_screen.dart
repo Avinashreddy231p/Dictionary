@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../data/models/settings_state.dart';
+import '../../../data/services/export_service.dart';
+import '../../../data/services/file_import_service.dart';
 import '../../../theme/app_colors.dart';
 
 class StorageSettingsScreen extends ConsumerWidget {
@@ -25,28 +27,25 @@ class StorageSettingsScreen extends ConsumerWidget {
   void _exportVocabulary(BuildContext context, WidgetRef ref) async {
     try {
       final words = await ref.read(databaseProvider).watchAllSavedWords().first;
-      final jsonList = words
-          .map((w) => {
-                'word': w.word,
-                'phonetic': w.phonetic,
-                'partOfSpeech': w.partOfSpeech,
-                'meaning': w.meaning,
-                'example': w.example,
-                'cefr': w.cefr,
-                'dateAdded': w.dateAdded.toIso8601String(),
-              })
-          .toList();
+      if (words.isEmpty) {
+        if (context.mounted) {
+          _showFeedback(context, 'No saved vocabulary words to export');
+        }
+        return;
+      }
 
-      final jsonString = const JsonEncoder.withIndent('  ').convert(jsonList);
-      await Clipboard.setData(ClipboardData(text: jsonString));
-
+      final jsonString = ExportService.exportToFullJson(words);
       if (context.mounted) {
-        _showFeedback(
-            context, 'Exported ${words.length} saved words to Clipboard as JSON!');
+        await ExportService.exportAndShareFile(
+          context: context,
+          filename: 'Dictionary_Backup.json',
+          content: jsonString,
+          successMessage: 'Exported ${words.length} saved words to backup file',
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        _showFeedback(context, 'Export completed');
+        _showFeedback(context, 'Export failed: $e');
       }
     }
   }
@@ -60,34 +59,60 @@ class StorageSettingsScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         title: const Text(
-          'Import Vocabulary JSON',
+          'Import Vocabulary Backup',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Paste vocabulary JSON backup text below:'),
+            const Text('Pick a backup file (.json / .csv) or paste text below:'),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               maxLines: 5,
               decoration: InputDecoration(
-                hintText: '[{"word": "serene", "meaning": "calm"}, ...]',
+                hintText: '[{"word": "serene", "meaning": "calm"}, ...]\nor\nword;partOfSpeech;phonetic;meaning',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () async {
-                final data = await Clipboard.getData(Clipboard.kTextPlain);
-                if (data != null && data.text != null) {
-                  controller.text = data.text!;
-                }
-              },
-              icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 16),
-              label: const Text('Paste from Clipboard'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () async {
+                      final fileResult = await FileImportService.pickAndReadBackupFile();
+                      if (fileResult != null && fileResult.content.isNotEmpty) {
+                        controller.text = fileResult.content;
+                      }
+                    },
+                    icon: const Icon(CupertinoIcons.folder_badge_plus, size: 18),
+                    label: const Text('Pick File'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data != null && data.text != null) {
+                        controller.text = data.text!;
+                      }
+                    },
+                    icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 16),
+                    label: const Text('Clipboard'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -98,10 +123,17 @@ class StorageSettingsScreen extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () async {
-              final jsonStr = controller.text.trim();
-              if (jsonStr.isEmpty) return;
+              final rawInput = controller.text.trim();
+              if (rawInput.isEmpty) return;
               final db = ref.read(databaseProvider);
-              final count = await notifier.importVocabularyJson(jsonStr, db);
+
+              int count = 0;
+              if (rawInput.startsWith('[')) {
+                count = await notifier.importVocabularyJson(rawInput, db);
+              } else {
+                count = await notifier.importVocabularyCsv(rawInput, db);
+              }
+
               if (ctx.mounted) {
                 Navigator.pop(ctx);
                 _showFeedback(

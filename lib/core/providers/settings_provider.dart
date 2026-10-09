@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,6 +43,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keyBorderWidthStyle = 'settings_border_width_style';
   static const _keySearchBarShape = 'settings_search_bar_shape';
   static const _keyDefinitionDensity = 'settings_definition_density';
+  static const _keyEnableAnimations = 'settings_enable_animations';
+  static const _keyCardShadowStyle = 'settings_card_shadow_style';
+  static const _keyPageTransitionStyle = 'settings_page_transition_style';
+  static const _keyHeaderStyle = 'settings_header_style';
 
   @override
   SettingsState build() {
@@ -83,6 +88,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final borderWidthStyle = _prefs.getString(_keyBorderWidthStyle) ?? 'standard';
     final searchBarShape = _prefs.getString(_keySearchBarShape) ?? 'pill';
     final definitionDensity = _prefs.getString(_keyDefinitionDensity) ?? 'spacious';
+    final enableAnimations = _prefs.getBool(_keyEnableAnimations) ?? true;
+    final cardShadowStyle = _prefs.getString(_keyCardShadowStyle) ?? 'soft';
+    final pageTransitionStyle = _prefs.getString(_keyPageTransitionStyle) ?? 'standard';
+    final headerStyle = _prefs.getString(_keyHeaderStyle) ?? 'glassmorphism';
 
     return SettingsState(
       themeMode: themeMode,
@@ -112,6 +121,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
       borderWidthStyle: borderWidthStyle,
       searchBarShape: searchBarShape,
       definitionDensity: definitionDensity,
+      enableAnimations: enableAnimations,
+      cardShadowStyle: cardShadowStyle,
+      pageTransitionStyle: pageTransitionStyle,
+      headerStyle: headerStyle,
     );
   }
 
@@ -210,6 +223,10 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.setString(_keyThemeVariant, variant);
   }
 
+  Future<void> setUseOledBlack(bool enabled) async {
+    await setThemeVariant(enabled ? 'oled' : 'standard');
+  }
+
   Future<void> setShowBgBlobs(bool show) async {
     state = state.copyWith(showBgBlobs: show);
     await _prefs.setBool(_keyShowBgBlobs, show);
@@ -250,26 +267,108 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.setString(_keyDefinitionDensity, density);
   }
 
-  Future<int> importVocabularyJson(String jsonString, AppDatabase db) async {
+  Future<void> setEnableAnimations(bool enable) async {
+    state = state.copyWith(enableAnimations: enable);
+    await _prefs.setBool(_keyEnableAnimations, enable);
+  }
+
+  Future<void> setCardShadowStyle(String style) async {
+    state = state.copyWith(cardShadowStyle: style);
+    await _prefs.setString(_keyCardShadowStyle, style);
+  }
+
+  Future<void> setPageTransitionStyle(String style) async {
+    state = state.copyWith(pageTransitionStyle: style);
+    await _prefs.setString(_keyPageTransitionStyle, style);
+  }
+
+  Future<void> setHeaderStyle(String style) async {
+    state = state.copyWith(headerStyle: style);
+    await _prefs.setString(_keyHeaderStyle, style);
+  }
+
+  Future<int> importVocabularyJson(String jsonString, AppDatabase db, {int? collectionId}) async {
     try {
       final List<dynamic> list = jsonDecode(jsonString);
-      int importedCount = 0;
+      final companions = <SavedWordsCompanion>[];
 
       for (final item in list) {
         if (item is Map<String, dynamic> && item.containsKey('word')) {
-          final word = item['word'] as String;
-          await db.saveWord(
-            word: word,
-            phonetic: item['phonetic'] as String?,
-            partOfSpeech: item['partOfSpeech'] as String?,
-            meaning: item['meaning'] as String?,
-            example: item['example'] as String?,
-            cefr: item['cefr'] as String? ?? 'B2',
-          );
-          importedCount++;
+          final word = (item['word'] as String).trim();
+          if (word.isEmpty) continue;
+
+          DateTime dateAdded = DateTime.now();
+          if (item['dateAdded'] != null) {
+            final parsed = DateTime.tryParse(item['dateAdded'].toString());
+            if (parsed != null) dateAdded = parsed;
+          }
+
+          companions.add(SavedWordsCompanion.insert(
+            word: word.toLowerCase(),
+            phonetic: Value(item['phonetic'] as String?),
+            partOfSpeech: Value(item['partOfSpeech'] as String?),
+            meaning: Value(item['meaning'] as String?),
+            example: Value(item['example'] as String?),
+            syllables: Value(item['syllables'] as String?),
+            cefr: Value(item['cefr'] as String? ?? 'B2'),
+            dateAdded: dateAdded,
+            contextSentence: Value(item['contextSentence'] as String?),
+            personalNote: Value(item['personalNote'] as String?),
+            source: Value(item['source'] as String? ?? 'Backup Import'),
+            reviewState: Value((item['reviewState'] as num?)?.toInt() ?? 0),
+            isFavorite: Value((item['isFavorite'] as bool?) ?? false),
+          ));
         }
       }
-      return importedCount;
+
+      if (companions.isEmpty) return 0;
+      if (collectionId != null) {
+        return await db.batchSaveWordsAndAddToCollection(companions, collectionId);
+      }
+      return await db.batchSaveWords(companions);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<int> importVocabularyCsv(String csvString, AppDatabase db, {int? collectionId}) async {
+    try {
+      final lines = const LineSplitter().convert(csvString);
+      final companions = <SavedWordsCompanion>[];
+
+      for (final rawLine in lines) {
+        final line = rawLine.trim();
+        if (line.isEmpty || line.startsWith('#')) continue;
+
+        final delimiter = line.contains(';') ? ';' : ',';
+        final parts = line.split(delimiter).map((e) => e.trim().replaceAll('"', '')).toList();
+
+        if (parts.isNotEmpty && parts[0].isNotEmpty) {
+          final word = parts[0];
+          final pos = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : null;
+          final phonetic = parts.length > 2 && parts[2].isNotEmpty ? parts[2] : null;
+          final meaning = parts.length > 3 && parts[3].isNotEmpty ? parts[3] : null;
+          final example = parts.length > 4 && parts[4].isNotEmpty ? parts[4] : null;
+          final source = parts.length > 5 && parts[5].isNotEmpty ? parts[5] : 'CSV Import';
+
+          companions.add(SavedWordsCompanion.insert(
+            word: word.toLowerCase(),
+            phonetic: Value(phonetic),
+            partOfSpeech: Value(pos),
+            meaning: Value(meaning),
+            example: Value(example),
+            cefr: const Value('B2'),
+            dateAdded: DateTime.now(),
+            source: Value(source),
+          ));
+        }
+      }
+
+      if (companions.isEmpty) return 0;
+      if (collectionId != null) {
+        return await db.batchSaveWordsAndAddToCollection(companions, collectionId);
+      }
+      return await db.batchSaveWords(companions);
     } catch (e) {
       return 0;
     }
@@ -312,5 +411,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.remove(_keyBorderWidthStyle);
     await _prefs.remove(_keySearchBarShape);
     await _prefs.remove(_keyDefinitionDensity);
+    await _prefs.remove(_keyEnableAnimations);
+    await _prefs.remove(_keyCardShadowStyle);
+    await _prefs.remove(_keyPageTransitionStyle);
+    await _prefs.remove(_keyHeaderStyle);
   }
 }

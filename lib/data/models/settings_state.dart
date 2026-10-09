@@ -28,6 +28,10 @@ class SettingsState {
   final String borderWidthStyle; // 'thin', 'standard', 'bold'
   final String searchBarShape; // 'pill', 'roundedBox'
   final String definitionDensity; // 'spacious', 'compact'
+  final bool enableAnimations;
+  final String cardShadowStyle; // 'none', 'soft', 'medium', 'deep', 'glowing'
+  final String pageTransitionStyle; // 'standard', 'zoom', 'fade', 'slide'
+  final String headerStyle; // 'glassmorphism', 'gradientCard', 'minimal'
 
   const SettingsState({
     this.themeMode = ThemeMode.system,
@@ -57,6 +61,10 @@ class SettingsState {
     this.borderWidthStyle = 'standard',
     this.searchBarShape = 'pill',
     this.definitionDensity = 'spacious',
+    this.enableAnimations = true,
+    this.cardShadowStyle = 'soft',
+    this.pageTransitionStyle = 'standard',
+    this.headerStyle = 'glassmorphism',
   });
 
   SettingsState copyWith({
@@ -87,6 +95,10 @@ class SettingsState {
     String? borderWidthStyle,
     String? searchBarShape,
     String? definitionDensity,
+    bool? enableAnimations,
+    String? cardShadowStyle,
+    String? pageTransitionStyle,
+    String? headerStyle,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
@@ -119,6 +131,12 @@ class SettingsState {
       borderWidthStyle: borderWidthStyle ?? this.borderWidthStyle,
       searchBarShape: searchBarShape ?? this.searchBarShape,
       definitionDensity: definitionDensity ?? this.definitionDensity,
+      enableAnimations: enableAnimations ?? this.enableAnimations,
+      cardShadowStyle: cardShadowStyle ?? this.cardShadowStyle,
+      pageTransitionStyle: pageTransitionStyle ?? this.pageTransitionStyle,
+      headerStyle: headerStyle ?? this.headerStyle,
     );
   }
+
+  bool get useOledBlack => themeVariant == 'oled';
 }

@@ -14,6 +14,7 @@ import '../screens/settings/sub_screens/about_settings_screen.dart';
 import '../screens/stats/stats_screen.dart';
 import '../screens/flashcards/flashcard_screen.dart';
 import '../screens/quiz/quiz_screen.dart';
+import '../features/reading/reading_screen.dart';
 import '../screens/main_scaffold.dart';
 import '../data/models/lexical_entry.dart';
 
@@ -44,6 +45,11 @@ final goRouter = GoRouter(
       path: '/quiz',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const QuizScreen(),
+    ),
+    GoRoute(
+      path: '/reading',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const ReadingScreen(),
     ),
     GoRoute(
       path: '/settings/appearance',

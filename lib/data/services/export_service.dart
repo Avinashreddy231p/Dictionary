@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +10,29 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/database/database.dart';
 
 class ExportService {
+  /// Converts saved words to full schema JSON backup string.
+  static String exportToFullJson(List<SavedWord> words) {
+    final jsonList = words
+        .map((w) => {
+              'word': w.word,
+              'phonetic': w.phonetic,
+              'partOfSpeech': w.partOfSpeech,
+              'meaning': w.meaning,
+              'example': w.example,
+              'syllables': w.syllables,
+              'cefr': w.cefr,
+              'dateAdded': w.dateAdded.toIso8601String(),
+              'contextSentence': w.contextSentence,
+              'personalNote': w.personalNote,
+              'reviewState': w.reviewState,
+              'isFavorite': w.isFavorite,
+              'source': w.source,
+            })
+        .toList();
+
+    return const JsonEncoder.withIndent('  ').convert(jsonList);
+  }
+
   /// Converts a list of saved vocabulary words to Anki-compatible CSV text.
   /// Format: word;partOfSpeech;phonetic;meaning;example;source
   static String exportToAnkiCsv(List<SavedWord> words) {

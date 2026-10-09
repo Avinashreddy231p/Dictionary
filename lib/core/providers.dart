@@ -60,19 +60,10 @@ final indexingProgressProvider = NotifierProvider<IndexingProgressNotifier, Inde
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  // Ensure database is seeded on startup and CSV dictionary dataset is auto-synced
-  db.seedDatabase().then((_) {
+  // Ensure database is seeded on startup and pre-indexed offline dataset is verified
+  db.seedDatabase().then((_) async {
     final service = OfflineDictionaryService(db);
-    service.autoSyncIfNeeded(
-      onProgress: (p, count) {
-        ref.read(indexingProgressProvider.notifier).setIndexing(
-          isIndexing: p < 1.0,
-          progress: p,
-          count: count,
-          status: p < 1.0 ? 'Preparing pre-indexed Offline Dictionary Database...' : 'Offline Dictionary Ready!',
-        );
-      },
-    );
+    await service.autoSyncIfNeeded();
   });
   ref.onDispose(db.close);
   return db;
