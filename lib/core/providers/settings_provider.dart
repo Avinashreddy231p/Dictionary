@@ -6,6 +6,34 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/database/database.dart';
 import '../../data/models/settings_state.dart';
 
+class BackupConfig {
+  final bool includeSettings;
+  final bool includeVocabulary;
+  final bool includeCollections;
+  final bool includeHistory;
+
+  BackupConfig({
+    this.includeSettings = true,
+    this.includeVocabulary = true,
+    this.includeCollections = true,
+    this.includeHistory = true,
+  });
+}
+
+class RestoreConfig {
+  final bool restoreSettings;
+  final RestoreStrategy wordStrategy;
+  final RestoreStrategy collectionStrategy;
+  final RestoreStrategy historyStrategy;
+
+  RestoreConfig({
+    this.restoreSettings = false,
+    this.wordStrategy = RestoreStrategy.mergeSkip,
+    this.collectionStrategy = RestoreStrategy.mergeSkip,
+    this.historyStrategy = RestoreStrategy.mergeSkip,
+  });
+}
+
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('sharedPreferencesProvider must be overridden in main()');
 });
@@ -135,7 +163,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   Future<void> setAccentColor(Color color) async {
     state = state.copyWith(accentColor: color);
-    await _prefs.setInt(_keyAccentColor, color.value);
+    await _prefs.setInt(_keyAccentColor, color.toARGB32());
   }
 
   Future<void> setFontScale(double scale) async {
@@ -380,6 +408,92 @@ class SettingsNotifier extends Notifier<SettingsState> {
       if (key.startsWith('search_history_') || key.startsWith('cache_')) {
         await _prefs.remove(key);
       }
+    }
+  }
+
+  // --- Export & Restore Settings ---
+  Map<String, dynamic> exportPreferences() {
+    final map = <String, dynamic>{};
+    final keys = _prefs.getKeys();
+    for (final key in keys) {
+      if (key.startsWith('settings_')) {
+        map[key] = _prefs.get(key);
+      }
+    }
+    return map;
+  }
+
+  Future<void> restorePreferences(Map<String, dynamic> prefsMap) async {
+    for (final entry in prefsMap.entries) {
+      final key = entry.key;
+      final value = entry.value;
+
+      if (value is int) {
+        await _prefs.setInt(key, value);
+      } else if (value is double) await _prefs.setDouble(key, value);
+      else if (value is bool) await _prefs.setBool(key, value);
+      else if (value is String) await _prefs.setString(key, value);
+      else if (value is List) {
+         await _prefs.setStringList(key, (value).map((e) => e.toString()).toList());
+      }
+    }
+    state = _loadFromPrefs();
+  }
+
+  Future<String> exportCustomBackup({
+    required BackupConfig config,
+    required AppDatabase db,
+    void Function(double, String)? onProgress,
+  }) async {
+    final payload = <String, dynamic>{
+      'version': 1,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    if (config.includeSettings) {
+      onProgress?.call(0.05, 'Exporting Settings...');
+      payload['preferences'] = exportPreferences();
+    }
+
+    final dbData = await db.exportUserDatabase(
+      includeWords: config.includeVocabulary,
+      includeCollections: config.includeCollections,
+      includeHistory: config.includeHistory,
+      onProgress: onProgress,
+    );
+
+    payload.addAll(dbData);
+    
+    onProgress?.call(0.9, 'Encoding Backup File...');
+    return const JsonEncoder().convert(payload);
+  }
+
+  Future<bool> restoreCustomBackup({
+    required String jsonStr,
+    required RestoreConfig config,
+    required AppDatabase db,
+    void Function(double, String)? onProgress,
+  }) async {
+    try {
+      onProgress?.call(0.05, 'Parsing Backup File...');
+      final payload = jsonDecode(jsonStr) as Map<String, dynamic>;
+
+      if (config.restoreSettings && payload.containsKey('preferences')) {
+        onProgress?.call(0.1, 'Restoring Settings...');
+        await restorePreferences(payload['preferences'] as Map<String, dynamic>);
+      }
+
+      await db.restoreUserDatabase(
+        payload,
+        wordStrategy: config.wordStrategy,
+        collectionStrategy: config.collectionStrategy,
+        historyStrategy: config.historyStrategy,
+        onProgress: onProgress,
+      );
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 

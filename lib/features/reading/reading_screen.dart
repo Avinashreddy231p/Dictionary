@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/database/database.dart';
 import '../../core/providers.dart';
-import '../../data/models/lexical_entry.dart';
 import '../../data/services/file_import_service.dart';
 import '../../theme/app_colors.dart';
 
@@ -209,7 +207,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.08),
+                      color: primaryColor.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Column(
@@ -229,7 +227,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontStyle: FontStyle.italic,
-                            color: isDark ? Colors.white.withOpacity(0.87) : AppColors.textPrimary,
+                            color: isDark ? Colors.white.withValues(alpha: 0.87) : AppColors.textPrimary,
                           ),
                         ),
                       ],
@@ -315,7 +313,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
               padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
               decoration: BoxDecoration(
-                color: isSelected ? primaryColor.withOpacity(0.25) : Colors.transparent,
+                color: isSelected ? primaryColor.withValues(alpha: 0.25) : Colors.transparent,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -327,7 +325,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? primaryColor
-                      : (isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF2C2C3E)),
+                      : (isDark ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF2C2C3E)),
                 ),
               ),
             ),

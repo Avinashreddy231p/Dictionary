@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
-import '../../core/providers/settings_provider.dart';
 import '../../data/models/lexical_entry.dart';
 import '../../theme/app_colors.dart';
 
@@ -117,11 +116,13 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final settings = ref.watch(settingsProvider);
 
     final savedWordsAsync = ref.watch(savedWordsStreamProvider);
+    final visitedWordsAsync = ref.watch(visitedWordsStreamProvider);
     final todayWordsAsync = ref.watch(todaySavedWordsStreamProvider);
     final masteredWordsAsync = ref.watch(masteredWordsStreamProvider);
     final needsReviewAsync = ref.watch(needsReviewStreamProvider);
 
     final allWords = savedWordsAsync.asData?.value ?? [];
+    final visitedWords = visitedWordsAsync.asData?.value ?? [];
     final todayWords = todayWordsAsync.asData?.value ?? [];
     final masteredWords = masteredWordsAsync.asData?.value ?? [];
     final needsReviewWords = needsReviewAsync.asData?.value ?? [];
@@ -158,6 +159,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 dailyGoal: settings.dailyGoal,
                 masteredCount: masteredWords.length,
                 streakDays: streakDays,
+                visitedCount: visitedWords.length,
               ),
               const SizedBox(height: 28),
               _buildSectionTitle(
@@ -225,7 +227,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4),
+        color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? const Color(0xFF383852) : AppColors.border,
@@ -322,6 +324,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     required int dailyGoal,
     required int masteredCount,
     required int streakDays,
+    required int visitedCount,
   }) {
     final percentGoal = ((todayCount / dailyGoal) * 100).round();
     final masteryRate = totalSaved == 0 ? 0 : ((masteredCount / totalSaved) * 100).round();
@@ -342,7 +345,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         : 'In the last 12 months'),
                 icon: CupertinoIcons.book_fill,
                 iconColor: primaryColor,
-                bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.5),
+                bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withValues(alpha: 0.5),
                 isDark: isDark,
               ),
             ),
@@ -355,7 +358,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 subtitle: streakDays > 0 ? 'Streak active' : 'Start streak today',
                 icon: CupertinoIcons.flame_fill,
                 iconColor: Colors.orange,
-                bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.5),
+                bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withValues(alpha: 0.5),
                 isDark: isDark,
               ),
             ),
@@ -372,7 +375,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 subtitle: '$percentGoal% goal completed',
                 icon: CupertinoIcons.checkmark_seal_fill,
                 iconColor: Colors.green,
-                bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withOpacity(0.5),
+                bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withValues(alpha: 0.5),
                 isDark: isDark,
               ),
             ),
@@ -385,7 +388,24 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 subtitle: '$masteredCount words mastered',
                 icon: CupertinoIcons.star_fill,
                 iconColor: Colors.amber,
-                bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.5),
+                bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withValues(alpha: 0.5),
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricTile(
+                context,
+                title: 'Words Visited',
+                value: '$visitedCount Explored 👁️',
+                subtitle: 'Total visited in dictionary',
+                icon: CupertinoIcons.eye_fill,
+                iconColor: const Color(0xFFA855F7),
+                bgColor: isDark ? const Color(0xFF2E1A47) : const Color(0xFFF3E8FF),
                 isDark: isDark,
               ),
             ),
@@ -411,7 +431,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? iconColor.withOpacity(0.3) : Colors.transparent,
+          color: isDark ? iconColor.withValues(alpha: 0.3) : Colors.transparent,
         ),
       ),
       child: Column(
@@ -421,7 +441,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(icon, color: iconColor, size: 20),
-              Icon(CupertinoIcons.arrow_up_right, color: iconColor.withOpacity(0.7), size: 14),
+              Icon(CupertinoIcons.arrow_up_right, color: iconColor.withValues(alpha: 0.7), size: 14),
             ],
           ),
           const SizedBox(height: 12),
@@ -594,7 +614,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.12),
+                        color: primaryColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -667,7 +687,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                               boxShadow: isCurrentPeriod
                                   ? [
                                       BoxShadow(
-                                        color: primaryColor.withOpacity(0.4),
+                                        color: primaryColor.withValues(alpha: 0.4),
                                         blurRadius: 10,
                                         offset: const Offset(0, 3),
                                       )
@@ -832,7 +852,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           borderRadius: BorderRadius.circular(8),
           child: LinearProgressIndicator(
             value: ratio,
-            backgroundColor: isDark ? const Color(0xFF32324A) : color.withOpacity(0.15),
+            backgroundColor: isDark ? const Color(0xFF32324A) : color.withValues(alpha: 0.15),
             color: color,
             minHeight: 8,
           ),
@@ -1035,7 +1055,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4),
+          color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isDark ? const Color(0xFF383852) : AppColors.border,
@@ -1132,7 +1152,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                 child: ListView.separated(
                   physics: const BouncingScrollPhysics(),
                   itemCount: words.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (ctx, index) {
                     final word = words[index];
                     return InkWell(
@@ -1147,7 +1167,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
                         decoration: BoxDecoration(
                           color: isDark
                               ? const Color(0xFF27273C)
-                              : AppColors.softPurple.withOpacity(0.3),
+                              : AppColors.softPurple.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark

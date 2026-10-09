@@ -12,7 +12,6 @@ import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
 import '../../data/services/export_service.dart';
-import '../../data/services/file_import_service.dart';
 
 class CollectionDetailScreen extends ConsumerStatefulWidget {
   final int? collectionId;
@@ -239,7 +238,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.15),
+                    color: Colors.redAccent.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(CupertinoIcons.trash, color: Colors.redAccent, size: 24),
@@ -572,11 +571,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     duration: const Duration(milliseconds: 300),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.15),
+                      color: primaryColor.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withOpacity(0.2),
+                          color: primaryColor.withValues(alpha: 0.2),
                           blurRadius: 16,
                           spreadRadius: 4,
                         ),
@@ -678,7 +677,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
       final file = File(filePath);
       await file.writeAsBytes(pngBytes);
 
-      await Share.shareXFiles(
+      await SharePlus.instance.share(
         [XFile(filePath)],
         text: 'Visual Poster Summary for $title (${words.length} words)',
         subject: '$title Vocabulary Card',
@@ -724,7 +723,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.15),
+                            color: primaryColor.withValues(alpha: 0.15),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(CupertinoIcons.photo_fill_on_rectangle_fill, color: primaryColor, size: 20),
@@ -749,10 +748,10 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: primaryColor.withOpacity(0.4), width: 1.5),
+                      border: Border.all(color: primaryColor.withValues(alpha: 0.4), width: 1.5),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryColor.withOpacity(0.15),
+                          color: primaryColor.withValues(alpha: 0.15),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
                         ),
@@ -776,7 +775,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: primaryColor.withOpacity(0.18),
+                                color: primaryColor.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
@@ -813,7 +812,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                               ],
                             ),
                           );
-                        }).toList(),
+                        }),
                         if (words.length > 5) ...[
                           const SizedBox(height: 4),
                           Text(
@@ -891,6 +890,8 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
     AsyncValue<List<SavedWord>> wordsAsync;
     if (widget.smartType == 'recent') {
       wordsAsync = ref.watch(recentSavedWordsProvider);
+    } else if (widget.smartType == 'visited') {
+      wordsAsync = ref.watch(visitedWordsStreamProvider);
     } else if (widget.smartType == 'review') {
       wordsAsync = ref.watch(needsReviewStreamProvider);
     } else if (widget.smartType == 'favorites') {
@@ -987,7 +988,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                               ),
                             ),
                             loading: () => const SizedBox.shrink(),
-                            error: (_, __) => const SizedBox.shrink(),
+                            error: (_, _) => const SizedBox.shrink(),
                           ),
                         ],
                       ),
@@ -1054,7 +1055,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                           );
                         },
                         loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
                       ),
                     ],
                   ),

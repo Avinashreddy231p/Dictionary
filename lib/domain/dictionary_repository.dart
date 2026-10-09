@@ -27,9 +27,8 @@ class DictionaryRepository {
 
   DictionaryRepository({
     MerriamWebsterService? service,
-    AppDatabase? db,
-  })  : _service = service ?? MerriamWebsterService(),
-        _db = db;
+    this._db,
+  })  : _service = service ?? MerriamWebsterService();
 
   Future<List<String>> getAutoSuggestions(String query) async {
     final cleanQuery = query.trim().toLowerCase();
@@ -40,7 +39,7 @@ class DictionaryRepository {
     // 1. Fetch offline SQLite DB suggestions
     if (_db != null) {
       try {
-        final offlineSuggestions = await _db!.getOfflineSuggestions(cleanQuery);
+        final offlineSuggestions = await _db.getOfflineSuggestions(cleanQuery);
         for (final s in offlineSuggestions) {
           if (!suggestions.contains(s)) {
             suggestions.add(s);
@@ -80,7 +79,7 @@ class DictionaryRepository {
       try {
         var mwResult = await _service.fetchWord(cleanQuery);
         if (mwResult.entries.isNotEmpty) {
-          return _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
+          return await _enrichAndReturn(cleanQuery, mwResult.entries, mwResult.suggestions);
         }
       } catch (_) {
         // Online API failed or offline
@@ -139,7 +138,7 @@ class DictionaryRepository {
         try {
           final altResult = await _service.fetchWord(noSpaces);
           if (altResult.entries.isNotEmpty) {
-            return _enrichAndReturn(
+            return await _enrichAndReturn(
               noSpaces,
               altResult.entries,
               altResult.suggestions,
@@ -156,7 +155,7 @@ class DictionaryRepository {
             try {
               final partResult = await _service.fetchWord(part);
               if (partResult.entries.isNotEmpty) {
-                return _enrichAndReturn(
+                return await _enrichAndReturn(
                   part,
                   partResult.entries,
                   partResult.suggestions,
@@ -214,7 +213,7 @@ class DictionaryRepository {
           try {
             final fuzzyMwResult = await _service.fetchWord(topMatch.word);
             if (fuzzyMwResult.entries.isNotEmpty) {
-              return _enrichAndReturn(
+              return await _enrichAndReturn(
                 topMatch.word,
                 fuzzyMwResult.entries,
                 rankedSuggestions.where((s) => s != topMatch.word).toList(),

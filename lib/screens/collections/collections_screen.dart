@@ -464,7 +464,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.15),
+                    color: Colors.redAccent.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(CupertinoIcons.trash, color: Colors.redAccent, size: 20),
@@ -507,7 +507,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.15),
+                      color: Colors.redAccent.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(CupertinoIcons.trash_fill, color: Colors.redAccent, size: 22),
@@ -578,6 +578,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     final recentWords = ref.watch(recentSavedWordsProvider).value ?? [];
+    final visitedWords = ref.watch(visitedWordsStreamProvider).value ?? [];
     final reviewWords = ref.watch(needsReviewStreamProvider).value ?? [];
     final favoriteWords = ref.watch(favoritesStreamProvider).value ?? [];
     final bookWords = ref.watch(wordsWithSourceStreamProvider).value ?? [];
@@ -620,6 +621,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       context,
                       filter: _selectedFilter,
                       recentCount: recentWords.length,
+                      visitedCount: visitedWords.length,
                       reviewCount: reviewWords.length,
                       favoritesCount: favoriteWords.length,
                       bookCount: bookWords.length,
@@ -896,6 +898,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     BuildContext context, {
     required String filter,
     required int recentCount,
+    required int visitedCount,
     required int reviewCount,
     required int favoritesCount,
     required int bookCount,
@@ -906,6 +909,31 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     final cards = <Widget>[];
     final fLower = filter.toLowerCase();
+
+    if (fLower == 'all' || fLower == 'visited') {
+      cards.add(
+        _buildSmartCard(
+          context,
+          title: 'All Words Visited',
+          subtitle: '$visitedCount words',
+          icon: CupertinoIcons.eye_fill,
+          color: isDark ? const Color(0xFF2E1A47) : const Color(0xFFF3E8FF),
+          textColor: isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CollectionDetailScreen(
+                  title: 'All Words Visited',
+                  description: 'Every word you have visited or searched',
+                  smartType: 'visited',
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    }
 
     if (fLower == 'all' || fLower == 'recent') {
       cards.add(
@@ -1089,7 +1117,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(28),
-        border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
+        border: isDark ? Border.all(color: textColor.withValues(alpha: 0.3), width: 1.5) : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -1108,7 +1136,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.black26 : Colors.white.withOpacity(0.7),
+                    color: isDark ? Colors.black26 : Colors.white.withValues(alpha: 0.7),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: textColor, size: 22),
@@ -1139,7 +1167,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
-                                  color: textColor.withOpacity(0.85),
+                                  color: textColor.withValues(alpha: 0.85),
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
@@ -1224,7 +1252,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1335,7 +1363,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: accentColor.withOpacity(isDark ? 0.25 : 0.45),
+                              color: accentColor.withValues(alpha: isDark ? 0.25 : 0.45),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -1417,7 +1445,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         ),
         child: const Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -1461,14 +1489,14 @@ class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: theme.colorScheme.background,
+        color: theme.colorScheme.surface,
         border: isPinned
             ? Border(bottom: BorderSide(color: AppColors.cardBorder(context), width: 1.5))
             : null,
         boxShadow: isPinned
             ? [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.25 : 0.05),
+                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 )

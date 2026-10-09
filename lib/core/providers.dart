@@ -173,8 +173,13 @@ final collectionIdsForWordStreamProvider = StreamProvider.family<List<int>, int>
   return db.watchCollectionIdsForWord(savedWordId);
 });
 
-// Recent Searches Provider
+// Recent Searches & Visited Words Provider
 final recentSearchesStreamProvider = StreamProvider<List<String>>((ref) {
   final db = ref.watch(databaseProvider);
   return db.watchRecentSearches();
+});
+
+final visitedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.watchVisitedWords();
 });

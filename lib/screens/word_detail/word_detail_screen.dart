@@ -53,7 +53,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   double _audioSpeed = 1.0;
 
   // Recall / Quiz Mode State
-  bool _isRecallMode = false;
+  final bool _isRecallMode = false;
   bool _isMeaningRevealed = false;
 
   // Datamuse Data
@@ -76,14 +76,23 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _logWordVisited();
     _loadExtraWordData();
   }
 
   @override
   void didUpdateWidget(covariant WordDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.entry != widget.entry) {
+    if (oldWidget.entry != widget.entry || oldWidget.initialWord != widget.initialWord) {
+      _logWordVisited();
       _loadExtraWordData();
+    }
+  }
+
+  void _logWordVisited() {
+    final word = widget.entry?.core.headword ?? widget.initialWord;
+    if (word != null && word.trim().isNotEmpty) {
+      ref.read(databaseProvider).addRecentSearch(word.trim().toLowerCase());
     }
   }
 
@@ -326,7 +335,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     try {
       final boundary = cardBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+        await SharePlus.instance.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
         return;
       }
 
@@ -341,14 +350,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       final file = File(filePath);
       await file.writeAsBytes(pngBytes);
 
-      await Share.shareXFiles(
+      await SharePlus.instance.share(
         [XFile(filePath)],
         text: shareCaption,
         subject: 'Word Card: ${entry.core.headword}',
       );
     } catch (e) {
       debugPrint('Error sharing card image: $e');
-      await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+      await SharePlus.instance.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
     }
   }
 
@@ -404,12 +413,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     color: cardBgColor,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: isDark ? accent.primary.withOpacity(0.3) : accent.primary.withOpacity(0.2),
+                      color: isDark ? accent.primary.withValues(alpha: 0.3) : accent.primary.withValues(alpha: 0.2),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: isDark ? Colors.black.withOpacity(0.25) : accent.primary.withOpacity(0.15),
+                        color: isDark ? Colors.black.withValues(alpha: 0.25) : accent.primary.withValues(alpha: 0.15),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       )
@@ -1238,7 +1247,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           )
@@ -1292,15 +1301,15 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
             color: isDark 
-                ? accent.primary.withOpacity(0.3) 
-                : accent.primary.withOpacity(0.2), 
+                ? accent.primary.withValues(alpha: 0.3) 
+                : accent.primary.withValues(alpha: 0.2), 
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
               color: isDark 
-                  ? Colors.black.withOpacity(0.25) 
-                  : accent.primary.withOpacity(0.18),
+                  ? Colors.black.withValues(alpha: 0.25) 
+                  : accent.primary.withValues(alpha: 0.18),
               blurRadius: 18,
               offset: const Offset(0, 6),
             )
@@ -1353,12 +1362,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           decoration: BoxDecoration(
                             color: _isPlaying 
                                 ? accent.primary 
-                                : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.75)),
+                                : (isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.75)),
                             shape: BoxShape.circle,
                             boxShadow: _isPlaying
                                 ? [
                                     BoxShadow(
-                                      color: accent.primary.withOpacity(0.5),
+                                      color: accent.primary.withValues(alpha: 0.5),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     )
@@ -1387,7 +1396,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           decoration: BoxDecoration(
                             color: _audioSpeed == 0.75
                                 ? accent.primary
-                                : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.5)),
+                                : (isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.5)),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
@@ -1406,10 +1415,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.85),
+                      color: isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isDark ? AppColors.darkBorder : accent.primary.withOpacity(0.25), 
+                        color: isDark ? AppColors.darkBorder : accent.primary.withValues(alpha: 0.25), 
                         width: 1.5,
                       ),
                     ),
@@ -1444,10 +1453,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.85),
+                  color: isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? AppColors.darkBorder : accent.primary.withOpacity(0.25), 
+                    color: isDark ? AppColors.darkBorder : accent.primary.withValues(alpha: 0.25), 
                     width: 1.2,
                   ),
                 ),
@@ -1465,7 +1474,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(CupertinoIcons.arrow_up_right, size: 12, color: subTextColor.withOpacity(0.7)),
+                    Icon(CupertinoIcons.arrow_up_right, size: 12, color: subTextColor.withValues(alpha: 0.7)),
                   ],
                 ),
               ),
@@ -1506,12 +1515,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.9),
+                  color: isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.9),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: accent.primary, width: 2.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     )
@@ -1522,7 +1531,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: accent.primary.withOpacity(0.15),
+                        color: accent.primary.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(CupertinoIcons.eye_slash_fill, size: 20, color: accent.primary),
@@ -1561,14 +1570,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               key: const ValueKey('meaning_revealed'),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.9),
+                color: isDark ? AppColors.darkTileBg : Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(24),
                 border: isDark
                     ? Border.all(color: AppColors.darkBorder, width: 1.5)
-                    : Border.all(color: accent.primary.withOpacity(0.2), width: 1.0),
+                    : Border.all(color: accent.primary.withValues(alpha: 0.2), width: 1.0),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   )
@@ -1582,8 +1591,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isDark 
-                          ? accent.primary.withOpacity(0.25) 
-                          : accent.primary.withOpacity(0.15),
+                          ? accent.primary.withValues(alpha: 0.25) 
+                          : accent.primary.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1603,7 +1612,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? accent.darkSoftText.withOpacity(0.85) : const Color(0xFF555566),
+                            color: isDark ? accent.darkSoftText.withValues(alpha: 0.85) : const Color(0xFF555566),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -1649,7 +1658,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(24),
-            border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : Border.all(color: AppColors.border),
+            border: isDark ? Border.all(color: textColor.withValues(alpha: 0.3), width: 1.5) : Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
@@ -1663,7 +1672,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       'Learning Progress',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: isDark ? textColor.withOpacity(0.8) : AppColors.textSecondary,
+                        color: isDark ? textColor.withValues(alpha: 0.8) : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1688,7 +1697,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     foregroundColor: textColor,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
-                    side: BorderSide(color: isDark ? textColor.withOpacity(0.4) : AppColors.border),
+                    side: BorderSide(color: isDark ? textColor.withValues(alpha: 0.4) : AppColors.border),
                   ),
                   onPressed: () async {
                     final db = ref.read(databaseProvider);
@@ -1702,7 +1711,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         );
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -1782,7 +1791,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         color: isDark ? AppColors.darkSoftPink : AppColors.examplePink,
         borderRadius: BorderRadius.circular(24),
         border: isDark
-            ? Border.all(color: AppColors.darkSoftPinkText.withOpacity(0.3), width: 1.5)
+            ? Border.all(color: AppColors.darkSoftPinkText.withValues(alpha: 0.3), width: 1.5)
             : null,
       ),
       child: Column(
@@ -1802,7 +1811,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             '"$capExample"',
             style: theme.textTheme.bodyMedium?.copyWith(
                   color: isDark
-                      ? AppColors.darkSoftPinkText.withOpacity(0.9)
+                      ? AppColors.darkSoftPinkText.withValues(alpha: 0.9)
                       : AppColors.textSecondary,
                   fontStyle: FontStyle.italic,
                   height: 1.4,
@@ -1900,7 +1909,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(20),
-            border: isDark ? Border.all(color: textColor.withOpacity(0.3), width: 1.5) : null,
+            border: isDark ? Border.all(color: textColor.withValues(alpha: 0.3), width: 1.5) : null,
           ),
           child: Text(
             root,
@@ -2061,7 +2070,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           margin: const EdgeInsets.only(right: 8, top: 2),
                           decoration: BoxDecoration(
-                            color: theme.primaryColor.withOpacity(0.1),
+                            color: theme.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -2175,7 +2184,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: isDark ? Border.all(color: textColor.withOpacity(0.3)) : null,
+        border: isDark ? Border.all(color: textColor.withValues(alpha: 0.3)) : null,
       ),
       child: Text(
         text,
@@ -2311,7 +2320,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
                         borderRadius: BorderRadius.circular(16),
-                        border: isDark ? Border.all(color: AppColors.darkSoftBlueText.withOpacity(0.3)) : null,
+                        border: isDark ? Border.all(color: AppColors.darkSoftBlueText.withValues(alpha: 0.3)) : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2358,7 +2367,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.darkSoftPink : AppColors.softPeach,
                         borderRadius: BorderRadius.circular(16),
-                        border: isDark ? Border.all(color: AppColors.darkSoftPinkText.withOpacity(0.3)) : null,
+                        border: isDark ? Border.all(color: AppColors.darkSoftPinkText.withValues(alpha: 0.3)) : null,
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2817,8 +2826,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         ),
       ),
       backgroundColor: isSelected
-          ? primaryColor.withOpacity(0.15)
-          : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.3)),
+          ? primaryColor.withValues(alpha: 0.15)
+          : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withValues(alpha: 0.3)),
       side: BorderSide(
         color: isSelected ? primaryColor : (isDark ? AppColors.darkBorder : AppColors.border),
       ),
@@ -2840,7 +2849,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF3EDFF),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: primaryColor.withOpacity(0.3),
+            color: primaryColor.withValues(alpha: 0.3),
             width: 1.5,
           ),
         ),
@@ -2849,7 +2858,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: primaryColor.withOpacity(0.15),
+                color: primaryColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
@@ -2886,12 +2895,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark ? primaryColor.withOpacity(0.4) : primaryColor.withOpacity(0.25),
+          color: isDark ? primaryColor.withValues(alpha: 0.4) : primaryColor.withValues(alpha: 0.25),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(0.08),
+            color: primaryColor.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -2905,7 +2914,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.15),
+                  color: primaryColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(CupertinoIcons.sparkles, color: primaryColor, size: 20),
@@ -2983,7 +2992,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               _buildStreamingResultCard(
                 context: context,
                 text: _aiMnemonicResult,
-                bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.6),
+                bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withValues(alpha: 0.6),
                 textColor: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
                 primaryColor: primaryColor,
                 isStreaming: _isAiStreaming,
@@ -3021,7 +3030,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               _buildStreamingResultCard(
                 context: context,
                 text: _aiNuanceResult,
-                bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.6),
+                bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withValues(alpha: 0.6),
                 textColor: isDark ? AppColors.darkSoftPurpleText : AppColors.textPrimary,
                 primaryColor: primaryColor,
                 isStreaming: _isAiStreaming,
@@ -3059,7 +3068,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               _buildStreamingResultCard(
                 context: context,
                 text: _aiExamplesResult,
-                bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.6),
+                bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withValues(alpha: 0.6),
                 textColor: isDark ? AppColors.darkSoftBlueText : AppColors.textPrimary,
                 primaryColor: primaryColor,
                 isStreaming: _isAiStreaming,
@@ -3113,7 +3122,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               _buildStreamingResultCard(
                 context: context,
                 text: _aiCustomResult,
-                bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withOpacity(0.6),
+                bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withValues(alpha: 0.6),
                 textColor: isDark ? AppColors.darkSoftGreenText : AppColors.textPrimary,
                 primaryColor: primaryColor,
                 isStreaming: _isAiStreaming,
@@ -3157,7 +3166,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         decoration: BoxDecoration(
           color: isSelected
               ? primaryColor
-              : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4)),
+              : (isDark ? AppColors.darkTileBg : AppColors.softPurple.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
@@ -3211,7 +3220,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: (isSaved ? theme.primaryColor : AppColors.buttonBlack).withOpacity(0.3),
+              color: (isSaved ? theme.primaryColor : AppColors.buttonBlack).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             )
