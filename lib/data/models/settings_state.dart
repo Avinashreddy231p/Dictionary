@@ -19,10 +19,18 @@ class SettingsState {
   final String geminiApiKey;
   final bool geminiAiEnabled;
   final String geminiModel; // "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"
+  final String themeVariant; // 'standard', 'sepia', 'oled'
+  final bool showBgBlobs;
+  final String bgTexture; // 'none', 'dots', 'grid', 'crosshatch'
+  final String appFontFamily; // 'SF Pro', 'SF Pro Display', 'SF Pro Rounded', 'Nunito', 'Inter', 'Lora', 'Fira Code'
+  final String cardRadiusStyle; // 'sharp', 'rounded', 'pill'
+  final String borderWidthStyle; // 'thin', 'standard', 'bold'
+  final String searchBarShape; // 'pill', 'roundedBox'
+  final String definitionDensity; // 'spacious', 'compact'
 
   const SettingsState({
     this.themeMode = ThemeMode.system,
-    this.accentColor = const Color(0xFF6344FF),
+    this.accentColor = const Color(0xFFFFBE98),
     this.fontScale = 1.0,
     this.preferredAccent = 'US',
     this.autoPlayAudio = true,
@@ -39,6 +47,14 @@ class SettingsState {
     this.geminiApiKey = '',
     this.geminiAiEnabled = true,
     this.geminiModel = 'gemini-2.0-flash',
+    this.themeVariant = 'standard',
+    this.showBgBlobs = true,
+    this.bgTexture = 'dots',
+    this.appFontFamily = 'Nunito',
+    this.cardRadiusStyle = 'rounded',
+    this.borderWidthStyle = 'standard',
+    this.searchBarShape = 'pill',
+    this.definitionDensity = 'spacious',
   });
 
   SettingsState copyWith({
@@ -60,6 +76,14 @@ class SettingsState {
     String? geminiApiKey,
     bool? geminiAiEnabled,
     String? geminiModel,
+    String? themeVariant,
+    bool? showBgBlobs,
+    String? bgTexture,
+    String? appFontFamily,
+    String? cardRadiusStyle,
+    String? borderWidthStyle,
+    String? searchBarShape,
+    String? definitionDensity,
   }) {
     return SettingsState(
       themeMode: themeMode ?? this.themeMode,
@@ -83,6 +107,14 @@ class SettingsState {
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       geminiAiEnabled: geminiAiEnabled ?? this.geminiAiEnabled,
       geminiModel: geminiModel ?? this.geminiModel,
+      themeVariant: themeVariant ?? this.themeVariant,
+      showBgBlobs: showBgBlobs ?? this.showBgBlobs,
+      bgTexture: bgTexture ?? this.bgTexture,
+      appFontFamily: appFontFamily ?? this.appFontFamily,
+      cardRadiusStyle: cardRadiusStyle ?? this.cardRadiusStyle,
+      borderWidthStyle: borderWidthStyle ?? this.borderWidthStyle,
+      searchBarShape: searchBarShape ?? this.searchBarShape,
+      definitionDensity: definitionDensity ?? this.definitionDensity,
     );
   }
 }

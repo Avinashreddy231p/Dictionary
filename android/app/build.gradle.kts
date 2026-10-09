@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.lexilens.lexi_lens"
+    namespace = "com.dictionary.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -14,9 +14,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        resValues = true
+        buildConfig = true
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.lexilens.lexi_lens"
+        applicationId = "com.dictionary.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -27,6 +32,32 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    flavorDimensions += "n8n"
+
+    productFlavors {
+        create("n8n_dev") {
+            dimension = "n8n"
+            applicationIdSuffix = ".dev"
+            resValue("string", "app_name", "Dictionary Dev")
+            resValue("string", "n8n_url", "https://dev.n8n.example.com/webhook/")
+            resValue("string", "n8n_env", "dev")
+        }
+        create("n8n_staging") {
+            dimension = "n8n"
+            applicationIdSuffix = ".staging"
+            resValue("string", "app_name", "Dictionary Staging")
+            resValue("string", "n8n_url", "https://staging.n8n.example.com/webhook/")
+            resValue("string", "n8n_env", "staging")
+        }
+        create("n8n_prod") {
+            dimension = "n8n"
+            isDefault = true
+            resValue("string", "app_name", "Dictionary")
+            resValue("string", "n8n_url", "https://n8n.example.com/webhook/")
+            resValue("string", "n8n_env", "prod")
+        }
     }
 
     buildTypes {

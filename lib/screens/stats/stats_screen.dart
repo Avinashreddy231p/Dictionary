@@ -100,7 +100,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       ],
       grammar: GrammarData(verbDivision: '', usageNotes: [], inflections: [], relatedForms: []),
       linguistic: LinguisticData(etymology: '', firstKnownUse: ''),
-      lexiLens: LexiLensLayer(
+      dictionaryLayer: DictionaryLayer(
         simpleMeaning: saved.meaning ?? 'No definition available',
         contextualMeaning: saved.contextSentence ?? '',
         synonyms: [],
@@ -145,7 +145,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(context, primaryColor),
+              _buildHeader(context, primaryColor, isDark),
               const SizedBox(height: 20),
               _buildTimeFilterSelector(context, primaryColor, isDark),
               const SizedBox(height: 24),
@@ -200,7 +200,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Color primaryColor) {
+  Widget _buildHeader(BuildContext context, Color primaryColor, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -214,7 +214,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         Text(
           'Track your vocabulary velocity, mastery, and daily habits.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
               ),
         ),
       ],
@@ -225,10 +225,10 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkTileBg : AppColors.softPurple.withOpacity(0.4),
+        color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.border,
+          color: isDark ? const Color(0xFF383852) : AppColors.border,
         ),
       ),
       child: Row(
@@ -476,7 +476,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     int numBins = 7;
 
     if (_selectedFilter == StatsTimeFilter.week) {
-      numBins = 14; // 14 scrollable days ending on TODAY
+      numBins = 14;
       labels = List.filled(numBins, '');
       counts = List.filled(numBins, 0);
 
@@ -498,7 +498,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         }
       }
     } else if (_selectedFilter == StatsTimeFilter.month) {
-      numBins = 30; // 30 scrollable daily bars ending on TODAY
+      numBins = 30;
       labels = List.filled(numBins, '');
       counts = List.filled(numBins, 0);
 
@@ -519,7 +519,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         }
       }
     } else {
-      numBins = 12; // 12 scrollable months ending on THIS MONTH
+      numBins = 12;
       labels = List.filled(numBins, '');
       counts = List.filled(numBins, 0);
 
@@ -552,7 +552,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final maxCount = counts.fold<int>(dailyGoal, (prev, curr) => curr > prev ? curr : prev);
     final totalInPeriod = counts.reduce((a, b) => a + b);
     final avgVal = (totalInPeriod / counts.length).toStringAsFixed(1);
-    final activeHighlightIndex = numBins - 1; // Always the rightmost bar (TODAY/NOW)
+    final activeHighlightIndex = numBins - 1; // Rightmost bar (TODAY / NOW)
 
     return _buildCardContainer(
       isDark: isDark,
@@ -562,41 +562,43 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Vocabulary Velocity',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Goal: $dailyGoal words/day',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Vocabulary Velocity',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Goal: $dailyGoal words/day',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.swap_horiz, size: 14, color: primaryColor),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Text(
-                      'Swipe chart',
+                      'Swipe',
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: primaryColor),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: primaryColor.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        'Avg: $avgVal/period',
+                        'Avg: $avgVal',
                         style: TextStyle(
                           color: primaryColor,
                           fontWeight: FontWeight.w800,
@@ -610,7 +612,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             ),
             const SizedBox(height: 24),
             SizedBox(
-              height: 160,
+              height: 185,
               child: SingleChildScrollView(
                 controller: _chartScrollController,
                 scrollDirection: Axis.horizontal,
@@ -950,12 +952,15 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     if (posMap.isEmpty) {
       return _buildCardContainer(
         isDark: isDark,
-        child: const Padding(
-          padding: EdgeInsets.all(20),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
           child: Center(
             child: Text(
               'No words saved in this period yet.',
-              style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),

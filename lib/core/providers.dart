@@ -69,7 +69,7 @@ final databaseProvider = Provider<AppDatabase>((ref) {
           isIndexing: p < 1.0,
           progress: p,
           count: count,
-          status: p < 1.0 ? 'Indexing local english Dictionary.csv dataset...' : 'Offline Dictionary Ready!',
+          status: p < 1.0 ? 'Preparing pre-indexed Offline Dictionary Database...' : 'Offline Dictionary Ready!',
         );
       },
     );

@@ -1,4 +1,4 @@
-package com.lexilens.lexi_lens
+package com.dictionary.app
 
 import io.flutter.embedding.android.FlutterActivity
 

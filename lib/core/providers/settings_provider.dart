@@ -33,6 +33,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keyGeminiApiKey = 'settings_gemini_api_key';
   static const _keyGeminiAiEnabled = 'settings_gemini_ai_enabled';
   static const _keyGeminiModel = 'settings_gemini_model';
+  static const _keyThemeVariant = 'settings_theme_variant';
+  static const _keyShowBgBlobs = 'settings_show_bg_blobs';
+  static const _keyBgTexture = 'settings_bg_texture';
+  static const _keyAppFontFamily = 'settings_app_font_family';
+  static const _keyCardRadiusStyle = 'settings_card_radius_style';
+  static const _keyBorderWidthStyle = 'settings_border_width_style';
+  static const _keySearchBarShape = 'settings_search_bar_shape';
+  static const _keyDefinitionDensity = 'settings_definition_density';
 
   @override
   SettingsState build() {
@@ -47,7 +55,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
         : ThemeMode.system;
 
     final accentVal = _prefs.getInt(_keyAccentColor);
-    final accentColor = accentVal != null ? Color(accentVal) : const Color(0xFF6344FF);
+    final accentColor = accentVal != null ? Color(accentVal) : const Color(0xFFFFBE98);
 
     final fontScale = _prefs.getDouble(_keyFontScale) ?? 1.0;
     final preferredAccent = _prefs.getString(_keyPreferredAccent) ?? 'US';
@@ -65,6 +73,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final geminiApiKey = _prefs.getString(_keyGeminiApiKey) ?? '';
     final geminiAiEnabled = _prefs.getBool(_keyGeminiAiEnabled) ?? true;
     final geminiModel = _prefs.getString(_keyGeminiModel) ?? 'gemini-2.0-flash';
+    final themeVariant = _prefs.getString(_keyThemeVariant) ?? 'standard';
+    final showBgBlobs = _prefs.getBool(_keyShowBgBlobs) ?? true;
+    final bgTexture = _prefs.getString(_keyBgTexture) ?? 'dots';
+    final appFontFamily = _prefs.getString(_keyAppFontFamily) ?? 'Nunito';
+    final cardRadiusStyle = _prefs.getString(_keyCardRadiusStyle) ?? 'rounded';
+    final borderWidthStyle = _prefs.getString(_keyBorderWidthStyle) ?? 'standard';
+    final searchBarShape = _prefs.getString(_keySearchBarShape) ?? 'pill';
+    final definitionDensity = _prefs.getString(_keyDefinitionDensity) ?? 'spacious';
 
     return SettingsState(
       themeMode: themeMode,
@@ -85,6 +101,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
       geminiApiKey: geminiApiKey,
       geminiAiEnabled: geminiAiEnabled,
       geminiModel: geminiModel,
+      themeVariant: themeVariant,
+      showBgBlobs: showBgBlobs,
+      bgTexture: bgTexture,
+      appFontFamily: appFontFamily,
+      cardRadiusStyle: cardRadiusStyle,
+      borderWidthStyle: borderWidthStyle,
+      searchBarShape: searchBarShape,
+      definitionDensity: definitionDensity,
     );
   }
 
@@ -178,6 +202,46 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.setString(_keyGeminiModel, model);
   }
 
+  Future<void> setThemeVariant(String variant) async {
+    state = state.copyWith(themeVariant: variant);
+    await _prefs.setString(_keyThemeVariant, variant);
+  }
+
+  Future<void> setShowBgBlobs(bool show) async {
+    state = state.copyWith(showBgBlobs: show);
+    await _prefs.setBool(_keyShowBgBlobs, show);
+  }
+
+  Future<void> setBgTexture(String texture) async {
+    state = state.copyWith(bgTexture: texture);
+    await _prefs.setString(_keyBgTexture, texture);
+  }
+
+  Future<void> setAppFontFamily(String fontFamily) async {
+    state = state.copyWith(appFontFamily: fontFamily);
+    await _prefs.setString(_keyAppFontFamily, fontFamily);
+  }
+
+  Future<void> setCardRadiusStyle(String radiusStyle) async {
+    state = state.copyWith(cardRadiusStyle: radiusStyle);
+    await _prefs.setString(_keyCardRadiusStyle, radiusStyle);
+  }
+
+  Future<void> setBorderWidthStyle(String widthStyle) async {
+    state = state.copyWith(borderWidthStyle: widthStyle);
+    await _prefs.setString(_keyBorderWidthStyle, widthStyle);
+  }
+
+  Future<void> setSearchBarShape(String shape) async {
+    state = state.copyWith(searchBarShape: shape);
+    await _prefs.setString(_keySearchBarShape, shape);
+  }
+
+  Future<void> setDefinitionDensity(String density) async {
+    state = state.copyWith(definitionDensity: density);
+    await _prefs.setString(_keyDefinitionDensity, density);
+  }
+
   Future<int> importVocabularyJson(String jsonString, AppDatabase db) async {
     try {
       final List<dynamic> list = jsonDecode(jsonString);
@@ -232,5 +296,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.remove(_keyGeminiApiKey);
     await _prefs.remove(_keyGeminiAiEnabled);
     await _prefs.remove(_keyGeminiModel);
+    await _prefs.remove(_keyThemeVariant);
+    await _prefs.remove(_keyShowBgBlobs);
+    await _prefs.remove(_keyBgTexture);
+    await _prefs.remove(_keyAppFontFamily);
+    await _prefs.remove(_keyCardRadiusStyle);
+    await _prefs.remove(_keyBorderWidthStyle);
+    await _prefs.remove(_keySearchBarShape);
+    await _prefs.remove(_keyDefinitionDensity);
   }
 }

@@ -1,6 +1,6 @@
-# lexi_lens
+# dictionary
 
-A new Flutter project.
+A modern Dictionary application.
 
 ## Getting Started
 

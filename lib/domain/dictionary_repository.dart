@@ -49,10 +49,10 @@ class DictionaryRepository {
       } catch (_) {}
     }
 
-    // 2. Fetch online Datamuse auto-complete suggestions if suggestions < 8
-    if (suggestions.length < 8) {
+    // 2. Fetch online Datamuse auto-complete suggestions if suggestions < 5
+    if (suggestions.length < 5) {
       try {
-        final uri = Uri.parse('https://api.datamuse.com/sug?s=${Uri.encodeComponent(cleanQuery)}&max=8');
+        final uri = Uri.parse('https://api.datamuse.com/sug?s=${Uri.encodeComponent(cleanQuery)}&max=5');
         final response = await http.get(uri).timeout(const Duration(milliseconds: 800));
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
@@ -68,7 +68,7 @@ class DictionaryRepository {
       } catch (_) {}
     }
 
-    return suggestions.take(10).toList();
+    return suggestions.take(5).toList();
   }
 
   Future<SearchResult> searchWord(String query) async {
@@ -286,7 +286,7 @@ class DictionaryRepository {
             etymology: 'Coined by songwriters Richard M. and Robert B. Sherman (1964).',
             firstKnownUse: '1964',
           ),
-          lexiLens: LexiLensLayer(
+          dictionaryLayer: DictionaryLayer(
             simpleMeaning: 'Extraordinarily wonderful; fantastically good.',
             contextualMeaning: 'Expressing extreme joy, wonder, or approval.',
             synonyms: ['wonderful', 'fantastic', 'extraordinary', 'marvelous', 'sensational'],
@@ -324,7 +324,7 @@ class DictionaryRepository {
               ],
               grammar: GrammarData(verbDivision: '', usageNotes: [], inflections: [], relatedForms: []),
               linguistic: LinguisticData(etymology: 'English term', firstKnownUse: ''),
-              lexiLens: LexiLensLayer(
+              dictionaryLayer: DictionaryLayer(
                 simpleMeaning: rawDef,
                 contextualMeaning: 'General usage.',
                 synonyms: [],
@@ -373,7 +373,7 @@ class DictionaryRepository {
         etymology: '',
         firstKnownUse: '',
       ),
-      lexiLens: LexiLensLayer(
+      dictionaryLayer: DictionaryLayer(
         simpleMeaning: meaning,
         contextualMeaning: saved.contextSentence ?? '',
         synonyms: [],
@@ -447,7 +447,7 @@ class DictionaryRepository {
             etymology: 'English phrase',
             firstKnownUse: '',
           ),
-          lexiLens: LexiLensLayer(
+          dictionaryLayer: DictionaryLayer(
             simpleMeaning: foundDef,
             contextualMeaning: 'Idiomatic usage in context.',
             synonyms: relatedWords.take(8).toList(),
@@ -491,7 +491,7 @@ class DictionaryRepository {
         senses: entry.senses,
         grammar: entry.grammar,
         linguistic: entry.linguistic,
-        lexiLens: entry.lexiLens.copyWith(
+        dictionaryLayer: entry.dictionaryLayer.copyWith(
           synonyms: synonyms,
           antonyms: antonyms,
         ),

@@ -1410,9 +1410,26 @@ class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isPinned = shrinkOffset > 5.0;
+
     return Container(
       height: height,
-      color: theme.scaffoldBackgroundColor,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.background,
+        border: isPinned
+            ? Border(bottom: BorderSide(color: AppColors.cardBorder(context), width: 1.5))
+            : null,
+        boxShadow: isPinned
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.25 : 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                )
+              ]
+            : null,
+      ),
       alignment: Alignment.center,
       child: child,
     );

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../theme/app_colors.dart';
 
@@ -30,7 +29,6 @@ class _PronunciationPracticeWidgetState
     extends State<PronunciationPracticeWidget>
     with SingleTickerProviderStateMixin {
   final AudioPlayer _audioPlayer = AudioPlayer();
-  final AudioRecorder _audioRecorder = AudioRecorder();
   late stt.SpeechToText _speech;
   late AnimationController _pulseController;
 
@@ -82,7 +80,6 @@ class _PronunciationPracticeWidgetState
   void dispose() {
     try {
       _speech.stop();
-      _audioRecorder.dispose();
       _pulseController.dispose();
       _audioPlayer.dispose();
     } catch (_) {}
@@ -122,40 +119,16 @@ class _PronunciationPracticeWidgetState
   void _startSpeechVerification() async {
     HapticFeedback.mediumImpact();
 
-    // 1. Request Android OS Runtime Microphone Permission
-    bool hasPermission = false;
-    try {
-      hasPermission = await _audioRecorder.hasPermission();
-    } catch (_) {}
-
-    if (!hasPermission) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Microphone permission required. Please grant microphone access.'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return;
-    }
-
-    // 2. Initialize Speech Recognizer
     if (!_speechEnabled) {
-      final available = await _speech.initialize();
-      _speechEnabled = available;
+      try {
+        final available = await _speech.initialize();
+        _speechEnabled = available;
+      } catch (_) {}
     }
 
     try {
       final docDir = await getApplicationDocumentsDirectory();
       _userAudioPath = '${docDir.path}/user_voice_${widget.headword.toLowerCase()}.m4a';
-
-      await _audioRecorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc),
-        path: _userAudioPath!,
-      );
     } catch (_) {}
 
     setState(() {
@@ -177,20 +150,26 @@ class _PronunciationPracticeWidgetState
               }
             }
           },
-          listenFor: const Duration(seconds: 6),
+          listenFor: const Duration(seconds: 5),
           pauseFor: const Duration(seconds: 2),
+          partialResults: true,
+          cancelOnError: false,
+          listenMode: stt.ListenMode.dictation,
           localeId: 'en_US',
         );
-      } catch (_) {}
+      } catch (_) {
+        await Future.delayed(const Duration(milliseconds: 2200));
+        if (mounted) _evaluateAndFinishSpeech();
+      }
+    } else {
+      await Future.delayed(const Duration(milliseconds: 2200));
+      if (mounted) _evaluateAndFinishSpeech();
     }
   }
 
   void _evaluateAndFinishSpeech() async {
     try {
       await _speech.stop();
-      if (await _audioRecorder.isRecording()) {
-        await _audioRecorder.stop();
-      }
     } catch (_) {}
 
     if (!mounted) return;
@@ -199,7 +178,6 @@ class _PronunciationPracticeWidgetState
     final target = widget.headword.trim().toLowerCase();
 
     if (spoken.isEmpty) {
-      // Strict microphone check: No speech detected from device microphone
       HapticFeedback.vibrate();
       setState(() {
         _isListening = false;
@@ -208,7 +186,7 @@ class _PronunciationPracticeWidgetState
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('No microphone speech detected. Please speak "${widget.headword}" clearly.'),
+          content: Text('No speech recognized. Please speak "${widget.headword}" clearly.'),
           backgroundColor: Colors.orange.shade800,
           behavior: SnackBarBehavior.floating,
         ),
@@ -216,16 +194,16 @@ class _PronunciationPracticeWidgetState
       return;
     }
 
-    // Strict Levenshtein edit distance accuracy score calculation
+    // Strict Levenshtein edit distance calculation
     final dist = _levenshteinDistance(spoken, target);
     final maxLen = max(spoken.length, target.length);
     double sim = maxLen == 0 ? 1.0 : (1.0 - (dist / maxLen));
 
-    if (spoken.contains(target) || target.contains(spoken)) {
-      sim = max(sim, 0.85);
+    if (spoken == target) {
+      sim = 1.0;
     }
 
-    final calculatedScore = (sim * 100).toInt().clamp(10, 100);
+    final calculatedScore = (sim * 100).toInt().clamp(0, 100);
 
     HapticFeedback.heavyImpact();
 
@@ -289,6 +267,9 @@ class _PronunciationPracticeWidgetState
             widget.headword.substring((widget.headword.length / 2).floor())
           ]
         : [widget.headword];
+
+    final isSuccess = _score >= 70;
+    final cardColor = isSuccess ? Colors.green : Colors.redAccent;
 
     return Container(
       width: double.infinity,
@@ -453,19 +434,19 @@ class _PronunciationPracticeWidgetState
               duration: const Duration(milliseconds: 400),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: (_score >= 70 ? Colors.green : Colors.orange.shade800).withOpacity(isDark ? 0.2 : 0.12),
+                color: cardColor.withOpacity(isDark ? 0.2 : 0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _score >= 70 ? Colors.green : Colors.orange.shade800, width: 2),
+                border: Border.all(color: cardColor, width: 2),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _score >= 70 ? Colors.green : Colors.orange.shade800,
+                      color: cardColor,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(_score >= 70 ? CupertinoIcons.checkmark : CupertinoIcons.exclamationmark, color: Colors.white, size: 20),
+                    child: Icon(isSuccess ? CupertinoIcons.checkmark : CupertinoIcons.xmark, color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -477,13 +458,13 @@ class _PronunciationPracticeWidgetState
                           children: [
                             Expanded(
                               child: Text(
-                                _score >= 90
+                                _score >= 85
                                     ? 'Excellent! 🎉'
-                                    : (_score >= 70 ? 'Great Job! 👍' : 'Try Again! 👂'),
+                                    : (_score >= 60 ? 'Good Attempt! 👍' : 'Incorrect Pronunciation ❌'),
                                 style: TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 14,
-                                  color: _score >= 70 ? Colors.green : Colors.orange.shade800,
+                                  color: cardColor,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -494,7 +475,7 @@ class _PronunciationPracticeWidgetState
                               style: TextStyle(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 14,
-                                color: _score >= 70 ? Colors.green : Colors.orange.shade800,
+                                color: cardColor,
                               ),
                             ),
                           ],
@@ -518,7 +499,7 @@ class _PronunciationPracticeWidgetState
                             return Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: (_score >= 70 ? Colors.green : Colors.orange).withOpacity(0.2),
+                                color: cardColor.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -529,11 +510,11 @@ class _PronunciationPracticeWidgetState
                                     style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 12,
-                                      color: _score >= 70 ? Colors.green : Colors.orange.shade800,
+                                      color: cardColor,
                                     ),
                                   ),
                                   const SizedBox(width: 2),
-                                  Icon(_score >= 70 ? Icons.check : Icons.circle, size: 12, color: _score >= 70 ? Colors.green : Colors.orange.shade800),
+                                  Icon(isSuccess ? Icons.check : Icons.close, size: 12, color: cardColor),
                                 ],
                               ),
                             );
@@ -627,7 +608,7 @@ class _PronunciationPracticeWidgetState
                       decoration: BoxDecoration(
                         color: _isListening
                             ? Colors.redAccent
-                            : (_hasVerified ? Colors.green : theme.primaryColor.withOpacity(0.6)),
+                            : (_hasVerified ? cardColor : theme.primaryColor.withOpacity(0.6)),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     );

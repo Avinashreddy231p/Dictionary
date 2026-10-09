@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
+import '../core/providers/settings_provider.dart';
+import '../theme/background_patterns.dart';
+import '../theme/app_colors.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -46,9 +49,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
+    final settings = ref.watch(settingsProvider);
 
     return Scaffold(
-      body: widget.navigationShell,
+      body: BackgroundTextureWidget(
+        texture: settings.bgTexture,
+        child: widget.navigationShell,
+      ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           indicatorColor: isDark

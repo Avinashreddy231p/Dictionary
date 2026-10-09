@@ -4,6 +4,7 @@ class CoreData {
   final String partOfSpeech;
   final String phonetic;
   final String audioUrl;
+  final String ukAudioUrl;
   final List<String> syllables;
 
   CoreData({
@@ -12,8 +13,10 @@ class CoreData {
     required this.partOfSpeech,
     required this.phonetic,
     required this.audioUrl,
+    String? ukAudioUrl,
     required this.syllables,
-  });
+  }) : ukAudioUrl = ukAudioUrl ??
+            'https://api.dictionaryapi.dev/media/pronunciations/en/${headword.toLowerCase()}-uk.mp3';
 }
 
 class Sense {
@@ -54,26 +57,26 @@ class LinguisticData {
   });
 }
 
-class LexiLensLayer {
+class DictionaryLayer {
   final String simpleMeaning;
   final String contextualMeaning;
   final List<String> synonyms;
   final List<String> antonyms;
 
-  LexiLensLayer({
+  DictionaryLayer({
     required this.simpleMeaning,
     required this.contextualMeaning,
     required this.synonyms,
     required this.antonyms,
   });
 
-  LexiLensLayer copyWith({
+  DictionaryLayer copyWith({
     String? simpleMeaning,
     String? contextualMeaning,
     List<String>? synonyms,
     List<String>? antonyms,
   }) {
-    return LexiLensLayer(
+    return DictionaryLayer(
       simpleMeaning: simpleMeaning ?? this.simpleMeaning,
       contextualMeaning: contextualMeaning ?? this.contextualMeaning,
       synonyms: synonyms ?? this.synonyms,
@@ -82,19 +85,23 @@ class LexiLensLayer {
   }
 }
 
+typedef LexiLensLayer = DictionaryLayer;
+
 class LexicalEntry {
   final CoreData core;
   final List<Sense> senses;
   final GrammarData grammar;
   final LinguisticData linguistic;
-  final LexiLensLayer lexiLens;
+  final DictionaryLayer dictionaryLayer;
+
+  DictionaryLayer get lexiLens => dictionaryLayer;
 
   LexicalEntry({
     required this.core,
     required this.senses,
     required this.grammar,
     required this.linguistic,
-    required this.lexiLens,
+    required this.dictionaryLayer,
   });
 
   factory LexicalEntry.fromMwJson(Map<String, dynamic> json) {
@@ -158,31 +165,26 @@ class LexicalEntry {
                 // Senses can be direct ["sense", {...}] or wrapped in "pseq" or "bs"
                 void processSenseMap(Map<String, dynamic> senseMap) {
                   final sn = cleanText(senseMap['sn']);
-                  String definition = '';
+                  String defText = '';
                   List<String> examples = [];
                   List<String> labels = [];
-
-                  if (senseMap['sls'] != null) {
-                    labels.addAll((senseMap['sls'] as List).map((e) => cleanText(e.toString())));
-                  }
 
                   if (senseMap['dt'] != null) {
                     for (var dtItem in (senseMap['dt'] as List)) {
                       if (dtItem is List && dtItem.length > 1) {
                         if (dtItem[0] == 'text') {
-                          definition += cleanText(dtItem[1].toString()) + ' ';
+                          defText += cleanText(dtItem[1].toString()) + ' ';
                         } else if (dtItem[0] == 'vis') {
-                          for (var v in (dtItem[1] as List)) {
-                            if (v is Map && v.containsKey('t')) {
-                              examples.add(cleanText(v['t'].toString()));
+                          for (var visObj in (dtItem[1] as List)) {
+                            if (visObj is Map && visObj.containsKey('t')) {
+                              examples.add(cleanText(visObj['t']));
                             }
                           }
                         } else if (dtItem[0] == 'uns') {
-                          for (var uGroup in (dtItem[1] as List)) {
-                            for (var u in uGroup) {
-                              if (u is List && u.length > 1 && u[0] == 'text') {
-                                globalUsageNotes.add(cleanText(u[1].toString()));
-                              }
+                          // Usage notes inside uns
+                          for (var unsTuple in (dtItem[1] as List)) {
+                            if (unsTuple is List && unsTuple.length > 1 && unsTuple[0] == 'text') {
+                              globalUsageNotes.add(cleanText(unsTuple[1].toString()));
                             }
                           }
                         }
@@ -190,21 +192,26 @@ class LexicalEntry {
                     }
                   }
 
-                  if (definition.trim().isNotEmpty) {
+                  if (senseMap['sls'] != null) {
+                    labels = (senseMap['sls'] as List).map((l) => cleanText(l.toString())).toList();
+                  }
+
+                  if (defText.trim().isNotEmpty) {
                     senses.add(Sense(
                       senseNumber: sn,
-                      definition: definition.trim(),
+                      definition: defText.trim(),
                       examples: examples,
                       labels: labels,
                     ));
                   }
                 }
 
-                if (senseTuple[0] == 'sense') {
+                final firstItem = senseTuple[0];
+                if (firstItem == 'sense' && senseTuple[1] is Map) {
                   processSenseMap(senseTuple[1] as Map<String, dynamic>);
-                } else if (senseTuple[0] == 'pseq' || senseTuple[0] == 'bs') {
+                } else if ((firstItem == 'pseq' || firstItem == 'bs') && senseTuple[1] is List) {
                   for (var subItem in (senseTuple[1] as List)) {
-                    if (subItem is List && subItem.length > 1 && subItem[0] == 'sense') {
+                    if (subItem is List && subItem.length > 1 && subItem[0] == 'sense' && subItem[1] is Map) {
                       processSenseMap(subItem[1] as Map<String, dynamic>);
                     }
                   }
@@ -216,26 +223,12 @@ class LexicalEntry {
       }
     }
 
-    // Fallback for senses if def parsing was empty
-    if (senses.isEmpty && json['shortdef'] != null) {
-      int count = 1;
-      for (var sd in (json['shortdef'] as List)) {
-        senses.add(Sense(
-          senseNumber: '$count',
-          definition: cleanText(sd.toString()),
-          examples: [],
-          labels: [],
-        ));
-        count++;
-      }
-    }
-
     // 3. Grammar Data
     List<String> inflections = [];
     if (json['ins'] != null) {
-      for (var ins in (json['ins'] as List)) {
-        if (ins['if'] != null) {
-          inflections.add(cleanText(ins['if']).replaceAll('*', ''));
+      for (var inObj in (json['ins'] as List)) {
+        if (inObj is Map && inObj.containsKey('if')) {
+          inflections.add(cleanText(inObj['if']));
         }
       }
     }
@@ -243,45 +236,56 @@ class LexicalEntry {
     List<String> relatedForms = [];
     if (json['uros'] != null) {
       for (var uro in (json['uros'] as List)) {
-        if (uro['ure'] != null) {
-          relatedForms.add(cleanText(uro['ure']).replaceAll('*', ''));
+        if (uro is Map && uro.containsKey('ure')) {
+          final form = cleanText(uro['ure']);
+          final pos = uro['fl'] != null ? ' (${cleanText(uro['fl'])})' : '';
+          relatedForms.add('$form$pos');
         }
       }
     }
 
     final grammar = GrammarData(
       verbDivision: verbDivision,
-      usageNotes: globalUsageNotes.toSet().toList(),
-      inflections: inflections.toSet().where((i) => i != headword).toList(),
-      relatedForms: relatedForms.toSet().toList(),
+      usageNotes: globalUsageNotes,
+      inflections: inflections,
+      relatedForms: relatedForms,
     );
 
     // 4. Linguistic Data
     String etymology = '';
-    if (json['et'] != null && (json['et'] as List).isNotEmpty) {
-      final etList = json['et'] as List;
-      if (etList[0] is List && etList[0].length > 1) {
-        etymology = cleanText(etList[0][1]);
+    if (json['et'] != null) {
+      for (var etItem in (json['et'] as List)) {
+        if (etItem is List && etItem.length > 1 && etItem[0] == 'text') {
+          etymology += cleanText(etItem[1].toString()) + ' ';
+        }
       }
     }
 
-    final firstKnownUse = cleanText(json['date']?.toString());
+    String firstKnownUse = '';
+    if (json['date'] != null) {
+      firstKnownUse = cleanText(json['date'].toString());
+    }
 
     final linguistic = LinguisticData(
-      etymology: etymology,
+      etymology: etymology.trim(),
       firstKnownUse: firstKnownUse,
     );
 
-    // 5. Initial LexiLens Layer
-    final firstDef = senses.isNotEmpty ? senses.first.definition : 'Vocabulary term';
-    String simpleMeaning = firstDef.split(';').first;
-    if (simpleMeaning.startsWith(':')) {
-      simpleMeaning = simpleMeaning.substring(1).trim();
+    // 5. LexiLens AI Layer (Defaults & Extraction)
+    String simpleMeaning = senses.isNotEmpty ? senses.first.definition : 'A lexical entry for $headword';
+    // Remove complex leading notation for simple meaning
+    if (simpleMeaning.contains(':')) {
+      final parts = simpleMeaning.split(':');
+      simpleMeaning = parts.where((p) => p.trim().isNotEmpty).first.trim();
     }
 
-    final lexiLens = LexiLensLayer(
-      simpleMeaning: simpleMeaning.isNotEmpty ? simpleMeaning : firstDef,
-      contextualMeaning: '',
+    String contextualMeaning = senses.isNotEmpty && senses.first.examples.isNotEmpty
+        ? senses.first.examples.first
+        : 'Used in everyday context and reading.';
+
+    final dictionaryLayer = DictionaryLayer(
+      simpleMeaning: simpleMeaning,
+      contextualMeaning: contextualMeaning,
       synonyms: [],
       antonyms: [],
     );
@@ -291,7 +295,7 @@ class LexicalEntry {
       senses: senses,
       grammar: grammar,
       linguistic: linguistic,
-      lexiLens: lexiLens,
+      dictionaryLayer: dictionaryLayer,
     );
   }
 }

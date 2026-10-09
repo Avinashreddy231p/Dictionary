@@ -28,34 +28,10 @@ class OfflineDictionaryService {
   Future<int> syncFromLocalOrRemote({
     void Function(double progress, int count)? onProgress,
   }) async {
-    // 1. Check local disk paths (e.g. english Dictionary.csv)
-    final candidatePaths = [
-      'english Dictionary.csv',
-      'C:/Users/Avina/Music/Projects/Dictionary/english Dictionary.csv',
-      p.join(Directory.current.path, 'english Dictionary.csv'),
-    ];
+    final currentCount = await _db.getOfflineWordsCount();
+    if (currentCount > 1000) return currentCount;
 
-    for (final path in candidatePaths) {
-      try {
-        final file = File(path);
-        if (await file.exists()) {
-          final content = await file.readAsString();
-          if (content.isNotEmpty) {
-            return await importCsvString(content, onProgress: onProgress);
-          }
-        }
-      } catch (_) {}
-    }
-
-    // 2. Check Flutter Asset Bundle
-    try {
-      final assetContent = await rootBundle.loadString('english Dictionary.csv');
-      if (assetContent.isNotEmpty) {
-        return await importCsvString(assetContent, onProgress: onProgress);
-      }
-    } catch (_) {}
-
-    // 3. Fallback to HTTP download
+    // Fallback to HTTP download if asset copy didn't occur
     return await downloadAndSyncDatabase(onProgress: onProgress);
   }
 

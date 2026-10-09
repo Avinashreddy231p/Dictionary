@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.lexilens" "\0"
-            VALUE "FileDescription", "lexi_lens" "\0"
+            VALUE "CompanyName", "com.dictionary" "\0"
+            VALUE "FileDescription", "dictionary" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "lexi_lens" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.lexilens. All rights reserved." "\0"
-            VALUE "OriginalFilename", "lexi_lens.exe" "\0"
-            VALUE "ProductName", "lexi_lens" "\0"
+            VALUE "InternalName", "dictionary" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.dictionary. All rights reserved." "\0"
+            VALUE "OriginalFilename", "dictionary.exe" "\0"
+            VALUE "ProductName", "dictionary" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

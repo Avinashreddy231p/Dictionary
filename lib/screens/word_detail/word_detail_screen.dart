@@ -9,7 +9,11 @@ import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
+import '../../core/utils/pos_helper.dart';
+import '../../core/utils/url_helper.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_accents.dart';
+import '../../theme/background_patterns.dart';
 import '../../data/models/lexical_entry.dart';
 import 'widgets/pronunciation_practice_widget.dart';
 
@@ -106,8 +110,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final word = active.core.headword.toLowerCase();
     if (word.isEmpty) return;
 
-    final existingSyns = active.lexiLens.synonyms;
-    final existingAnts = active.lexiLens.antonyms;
+    final existingSyns = active.dictionaryLayer.synonyms;
+    final existingAnts = active.dictionaryLayer.antonyms;
 
     if (existingSyns.isNotEmpty || existingAnts.isNotEmpty) {
       setState(() {
@@ -163,15 +167,36 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     }
   }
 
-  void _playAudio(String url) async {
-    if (url.isEmpty || _isPlaying) return;
+  void _playAudio(String url, {LexicalEntry? entry}) async {
+    if (_isPlaying) return;
+
+    final settings = ref.read(settingsProvider);
+    String targetUrl = url;
+
+    if (entry != null) {
+      final accent = settings.preferredAccent;
+      final primaryUrl = accent == 'UK' ? entry.core.ukAudioUrl : entry.core.audioUrl;
+      final fallbackUrl = accent == 'UK' ? entry.core.audioUrl : entry.core.ukAudioUrl;
+      targetUrl = primaryUrl.isNotEmpty ? primaryUrl : fallbackUrl;
+    }
+
+    if (targetUrl.isEmpty) return;
+
     try {
       setState(() => _isPlaying = true);
-      await _audioPlayer.setUrl(url);
-      await _audioPlayer.setSpeed(_audioSpeed);
+      await _audioPlayer.setSpeed(settings.audioSpeed);
+      await _audioPlayer.setUrl(targetUrl);
       await _audioPlayer.play();
-    } catch (e) {
-      // Audio error handling
+    } catch (_) {
+      if (entry != null) {
+        final fallback = settings.preferredAccent == 'UK' ? entry.core.audioUrl : entry.core.ukAudioUrl;
+        if (fallback.isNotEmpty && fallback != targetUrl) {
+          try {
+            await _audioPlayer.setUrl(fallback);
+            await _audioPlayer.play();
+          } catch (_) {}
+        }
+      }
     } finally {
       if (mounted) {
         setState(() => _isPlaying = false);
@@ -249,7 +274,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           word: entry.core.headword,
           phonetic: entry.core.phonetic,
           partOfSpeech: entry.core.partOfSpeech,
-          meaning: entry.lexiLens.simpleMeaning,
+          meaning: entry.dictionaryLayer.simpleMeaning,
           example: example,
           syllables: entry.core.syllables.join('*'),
           cefr: 'B2',
@@ -337,7 +362,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           ),
                         ),
                         Text(
-                          'LexiLens',
+                          'Dictionary',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: isDark ? AppColors.darkSoftYellowText : AppColors.primaryPurple,
@@ -346,7 +371,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       ],
                     ),
                     Text(
-                      '${entry.core.phonetic} • ${entry.core.partOfSpeech}',
+                      '${entry.core.phonetic} • ${formatPartOfSpeech(entry.core.partOfSpeech)}',
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: isDark ? AppColors.darkSoftYellowText.withOpacity(0.8) : AppColors.textSecondary,
@@ -354,7 +379,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      '"${entry.lexiLens.simpleMeaning}"',
+                      '"${entry.dictionaryLayer.simpleMeaning}"',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -379,8 +404,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     Clipboard.setData(ClipboardData(
                       text: '${entry.core.headword.toUpperCase()} (${entry.core.phonetic})\n'
                           '${entry.core.partOfSpeech}\n\n'
-                          'Meaning: ${entry.lexiLens.simpleMeaning}\n\n'
-                          'Learned with LexiLens ✨',
+                          'Meaning: ${entry.dictionaryLayer.simpleMeaning}\n\n'
+                          'Learned with Dictionary ✨',
                     ));
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -401,11 +426,156 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  void _showCollectionsSheet(BuildContext context, WidgetRef ref, SavedWord savedWord) {
-    final db = ref.read(databaseProvider);
+  void _showCreateNewCollectionDialog(BuildContext context, AppDatabase db, SavedWord savedWord) {
+  void _showCreateNewCollectionDialog(BuildContext context, AppDatabase db, SavedWord savedWord) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 24,
+            left: 24,
+            right: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(CupertinoIcons.folder_badge_plus, color: primaryColor, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Create New Collection',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.xmark),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  autofocus: true,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Collection Title',
+                    labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
+                    hintText: 'e.g., Academic Words, GRE Prep',
+                    fillColor: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Description (Optional)',
+                    labelStyle: TextStyle(color: primaryColor.withOpacity(0.8), fontWeight: FontWeight.w700),
+                    hintText: 'e.g., Key vocabulary for my exam',
+                    fillColor: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
+                    filled: true,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 2,
+                    ),
+                    onPressed: () async {
+                      final title = titleController.text.trim();
+                      if (title.isNotEmpty) {
+                        Navigator.pop(ctx);
+                        final colId = await db.createCollection(
+                          title: title,
+                          description: descController.text.trim().isNotEmpty ? descController.text.trim() : null,
+                          colorHex: '0xFF8B5CF6',
+                        );
+                        await db.addWordToCollection(colId, savedWord.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Created "$title" & added "${savedWord.word}"!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(CupertinoIcons.checkmark_seal_fill, size: 18),
+                    label: const Text(
+                      'Create & Add',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCollectionsSheet(BuildContext context, WidgetRef ref, SavedWord savedWord) {
+    final db = ref.read(databaseProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -440,11 +610,25 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Select which collections to include this word in:',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select collections for this word:',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showCreateNewCollectionDialog(context, db, savedWord);
+                        },
+                        icon: const Icon(CupertinoIcons.add, size: 14),
+                        label: const Text('New Collection', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   userColsAsync.when(
                     data: (cols) {
                       final assignedIds = wordColIdsAsync.value ?? [];
@@ -452,7 +636,24 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       if (cols.isEmpty) {
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Text('No custom collections yet.', style: Theme.of(context).textTheme.bodyMedium),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('No custom collections created yet.', style: Theme.of(context).textTheme.bodyMedium),
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(ctx);
+                                  _showCreateNewCollectionDialog(context, db, savedWord);
+                                },
+                                icon: const Icon(CupertinoIcons.add, size: 16),
+                                label: const Text('Create First Collection'),
+                              ),
+                            ],
+                          ),
                         );
                       }
 
@@ -540,6 +741,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final word = entry.core.headword;
     final isSavedAsync = ref.watch(isWordSavedStreamProvider(word.toLowerCase()));
     final isSaved = isSavedAsync.value ?? false;
+    final settings = ref.watch(settingsProvider);
 
     // Watch saved word for notes
     final savedWordAsync = ref.watch(savedWordStreamProvider(word.toLowerCase()));
@@ -551,20 +753,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // 1. FLOATING APP BAR
-            _buildTopBar(context, ref, isSaved),
+      body: BackgroundTextureWidget(
+        texture: settings.bgTexture,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 1. FLOATING APP BAR
+              _buildTopBar(context, ref, isSaved, entry),
 
-            // 2. SCROLLABLE CONTENT WITH STAGGERED FLUID ENTRANCE ANIMATIONS
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              // 2. SCROLLABLE CONTENT WITH STAGGERED FLUID ENTRANCE ANIMATIONS
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                     const SizedBox(height: 8),
 
                     // HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
@@ -697,11 +901,15 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // FLOATING APP BAR
-  Widget _buildTopBar(BuildContext context, WidgetRef ref, bool isSaved) {
+  Widget _buildTopBar(BuildContext context, WidgetRef ref, bool isSaved, LexicalEntry entry) {
+    final theme = Theme.of(context);
+    final word = entry.core.headword;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
@@ -721,6 +929,16 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           ),
           Row(
             children: [
+              _BouncyTouch(
+                onTap: () => launchGoogleDefinition(word),
+                child: _buildFloatingIconButton(
+                  context,
+                  icon: CupertinoIcons.globe,
+                  iconColor: theme.primaryColor,
+                  onPressed: () => launchGoogleDefinition(word),
+                ),
+              ),
+              const SizedBox(width: 10),
               _BouncyTouch(
                 onTap: () => _toggleSaveWord(context, ref),
                 child: _buildFloatingIconButton(
@@ -776,18 +994,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  // YELLOW HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
+  // ACCENT HEADER CARD WITH NESTED SIMPLE MEANING HERO CARD
   Widget _buildHeaderAndSimpleMeaning(BuildContext context, LexicalEntry entry) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     final word = entry.core.headword;
     final phonetic = entry.core.phonetic;
-    final pos = entry.core.partOfSpeech;
-    final simpleMeaning = entry.lexiLens.simpleMeaning;
+    final pos = formatPartOfSpeech(entry.core.partOfSpeech);
+    final simpleMeaning = entry.dictionaryLayer.simpleMeaning;
 
-    final blobColor = isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow;
-    final headerTextColor = isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary;
+    final settings = ref.watch(settingsProvider);
+    final accent = AppAccent.fromColor(settings.accentColor);
+
+    final blobColor = accent.adaptiveSoft(context);
+    final headerTextColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+    final subTextColor = isDark ? accent.darkSoftText : AppColors.textPrimary;
 
     final capMeaning = _capitalize(simpleMeaning);
     final formattedMeaning = capMeaning.isNotEmpty
@@ -796,7 +1018,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
     return GestureDetector(
       onTap: () {
-        _playAudio(entry.core.audioUrl);
+        _playAudio(entry.core.audioUrl, entry: entry);
         HapticFeedback.lightImpact();
       },
       child: AnimatedContainer(
@@ -807,10 +1029,17 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         decoration: BoxDecoration(
           color: blobColor,
           borderRadius: BorderRadius.circular(32),
-          border: isDark ? Border.all(color: headerTextColor.withOpacity(0.3), width: 1.5) : null,
+          border: Border.all(
+            color: isDark 
+                ? accent.primary.withOpacity(0.3) 
+                : accent.primary.withOpacity(0.2), 
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: blobColor.withOpacity(0.28),
+              color: isDark 
+                  ? Colors.black.withOpacity(0.25) 
+                  : accent.primary.withOpacity(0.18),
               blurRadius: 18,
               offset: const Offset(0, 6),
             )
@@ -850,25 +1079,25 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                         phonetic,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
-                          color: headerTextColor,
+                          color: subTextColor,
                           fontSize: 18,
                         ),
                       ),
                       // Audio Speaker Button
                       _BouncyTouch(
-                        onTap: () => _playAudio(entry.core.audioUrl),
+                        onTap: () => _playAudio(entry.core.audioUrl, entry: entry),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: _isPlaying 
-                                ? AppColors.primaryPurple 
+                                ? accent.primary 
                                 : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.75)),
                             shape: BoxShape.circle,
                             boxShadow: _isPlaying
                                 ? [
                                     BoxShadow(
-                                      color: AppColors.primaryPurple.withOpacity(0.5),
+                                      color: accent.primary.withOpacity(0.5),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     )
@@ -884,7 +1113,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                               : Icon(
                                   CupertinoIcons.speaker_2_fill, 
                                   size: 16, 
-                                  color: _isPlaying ? Colors.white : headerTextColor
+                                  color: _isPlaying ? Colors.white : subTextColor
                                 ),
                         ),
                       ),
@@ -896,7 +1125,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: _audioSpeed == 0.75
-                                ? AppColors.primaryPurple
+                                ? accent.primary
                                 : (isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.5)),
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -905,7 +1134,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
-                              color: _audioSpeed == 0.75 ? Colors.white : headerTextColor,
+                              color: _audioSpeed == 0.75 ? Colors.white : subTextColor,
                             ),
                           ),
                         ),
@@ -916,15 +1145,18 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkBadgeTeal : AppColors.badgeTeal,
+                      color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.85),
                       borderRadius: BorderRadius.circular(20),
-                      border: isDark ? Border.all(color: AppColors.darkBadgeTealText, width: 1.5) : null,
+                      border: Border.all(
+                        color: isDark ? AppColors.darkBorder : accent.primary.withOpacity(0.25), 
+                        width: 1.5,
+                      ),
                     ),
                     child: Text(
                       'B2',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w900,
-                        color: isDark ? AppColors.darkBadgeTealText : AppColors.textPrimary,
+                        color: isDark ? accent.darkSoftText : AppColors.textPrimary,
                       ),
                     ),
                   ),
@@ -936,7 +1168,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               Text(
                 pos,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: headerTextColor.withOpacity(0.85),
+                  color: subTextColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -945,6 +1177,38 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
             // SIMPLE MEANING HERO CARD
             _buildOverlappingSimpleMeaningCard(context, formattedMeaning),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => launchGoogleDefinition(word),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? AppColors.darkBorder : accent.primary.withOpacity(0.25), 
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.globe, size: 14, color: subTextColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Google Definition',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: subTextColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(CupertinoIcons.arrow_up_right, size: 12, color: subTextColor.withOpacity(0.7)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -955,6 +1219,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   Widget _buildOverlappingSimpleMeaningCard(BuildContext context, String meaning) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final settings = ref.watch(settingsProvider);
+    final accent = AppAccent.fromColor(settings.accentColor);
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 350),
@@ -979,9 +1245,9 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurface : const Color(0xFFFFFBF0),
+                  color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: theme.primaryColor, width: 2.0),
+                  border: Border.all(color: accent.primary, width: 2.0),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.08),
@@ -995,10 +1261,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withOpacity(0.15),
+                        color: accent.primary.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(CupertinoIcons.eye_slash_fill, size: 20, color: theme.primaryColor),
+                      child: Icon(CupertinoIcons.eye_slash_fill, size: 20, color: accent.primary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1010,14 +1276,18 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
-                              color: theme.primaryColor,
+                              color: accent.primary,
                               letterSpacing: 1.0,
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'Tap to reveal answer 👁️',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 14, 
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                            ),
                           ),
                         ],
                       ),
@@ -1030,11 +1300,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               key: const ValueKey('meaning_revealed'),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : const Color(0xFFFFFBF2),
+                color: isDark ? AppColors.darkTileBg : Colors.white.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(24),
                 border: isDark
                     ? Border.all(color: AppColors.darkBorder, width: 1.5)
-                    : Border.all(color: const Color(0xFFEFE8D8), width: 1.0),
+                    : Border.all(color: accent.primary.withOpacity(0.2), width: 1.0),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.06),
@@ -1046,17 +1316,19 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Yellow Circle with Lightbulb
+                  // Circle with Lightbulb
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkHeaderYellow : AppColors.headerYellow,
+                      color: isDark 
+                          ? accent.primary.withOpacity(0.25) 
+                          : accent.primary.withOpacity(0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       CupertinoIcons.lightbulb,
                       size: 20,
-                      color: isDark ? AppColors.darkHeaderYellowText : AppColors.textPrimary,
+                      color: isDark ? accent.darkSoftText : accent.primary,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -1070,7 +1342,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF555566),
+                            color: isDark ? accent.darkSoftText.withOpacity(0.85) : const Color(0xFF555566),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -2087,7 +2359,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       ref: ref,
       streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamMnemonic(
         entry.core.headword,
-        entry.lexiLens.simpleMeaning,
+        entry.dictionaryLayer.simpleMeaning,
         apiKey: apiKey,
         model: model,
       ),
@@ -2108,7 +2380,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamExplainNuance(
         entry.core.headword,
         entry.core.partOfSpeech,
-        entry.lexiLens.simpleMeaning,
+        entry.dictionaryLayer.simpleMeaning,
         apiKey: apiKey,
         model: model,
       ),

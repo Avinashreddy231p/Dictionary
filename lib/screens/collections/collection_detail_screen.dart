@@ -162,7 +162,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                                   word: query,
                                   phonetic: entry?.core.phonetic,
                                   partOfSpeech: entry?.core.partOfSpeech,
-                                  meaning: entry?.lexiLens.simpleMeaning ?? 'Saved custom word',
+                                  meaning: entry?.dictionaryLayer.simpleMeaning ?? 'Saved custom word',
                                   example: entry?.senses.isNotEmpty == true && entry!.senses.first.examples.isNotEmpty
                                       ? entry.senses.first.examples.first
                                       : null,
@@ -736,7 +736,7 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
             etymology: '',
             firstKnownUse: '',
           ),
-          lexiLens: LexiLensLayer(
+          dictionaryLayer: DictionaryLayer(
             simpleMeaning: item.meaning ?? 'No definition provided',
             contextualMeaning: item.contextSentence ?? '',
             synonyms: [],

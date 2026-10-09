@@ -60,7 +60,7 @@ class WordRepository {
             etymology: '',
             firstKnownUse: '',
           ),
-          lexiLens: LexiLensLayer(
+          dictionaryLayer: DictionaryLayer(
             simpleMeaning: meaning,
             contextualMeaning: saved.contextSentence ?? '',
             synonyms: [],

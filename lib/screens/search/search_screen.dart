@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../core/providers.dart';
+import '../../core/utils/pos_helper.dart';
 import '../../domain/dictionary_repository.dart';
 import '../../data/models/lexical_entry.dart';
 
@@ -54,7 +55,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       final suggestions = await repo.getAutoSuggestions(query);
       if (mounted && _searchController.text.trim().toLowerCase() == query.toLowerCase()) {
         setState(() {
-          _autoSuggestions = suggestions;
+          _autoSuggestions = suggestions.take(5).toList();
         });
       }
     });
@@ -175,7 +176,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ] else if (_lastQuery.isNotEmpty)
               _buildNoResults(context)
             else
-              _buildDidYouMean(context),
+              _buildRecentSearchesSection(context),
           ],
         ),
       ),
@@ -185,91 +186,75 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildAutoSuggestDropdown(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
-    final currentQuery = _searchController.text.trim().toLowerCase();
 
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1D1D2C) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2C2C3F) : AppColors.border,
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _autoSuggestions.asMap().entries.map((entry) {
-            final index = entry.key;
-            final suggestion = entry.value;
-            final isLast = index == _autoSuggestions.length - 1;
-
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InkWell(
-                  onTap: () {
-                    _searchController.text = suggestion;
-                    _performSearch(suggestion);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.search,
-                          size: 18,
+      margin: const EdgeInsets.only(top: 10),
+      height: 42,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        child: Row(
+          children: _autoSuggestions.map((suggestion) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: InkWell(
+                onTap: () {
+                  _searchController.text = suggestion;
+                  _performSearch(suggestion);
+                },
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF222234) : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF33334C) : const Color(0xFFE2E2E8),
+                      width: 1.2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.search,
+                        size: 13,
+                        color: isDark ? Colors.white60 : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        suggestion,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () {
+                          _searchController.text = suggestion;
+                          _searchController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: suggestion.length),
+                          );
+                        },
+                        child: Icon(
+                          CupertinoIcons.arrow_up_left,
+                          size: 12,
                           color: isDark ? Colors.white54 : AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: _buildHighlightedText(
-                            suggestion,
-                            currentQuery,
-                            isDark,
-                            primaryColor,
-                          ),
-                        ),
-                        // Google-style Auto-Fill button (copies to search bar without submitting)
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: Icon(
-                            CupertinoIcons.arrow_up_left,
-                            size: 18,
-                            color: isDark ? Colors.white38 : AppColors.textDisabled,
-                          ),
-                          tooltip: 'Auto-fill',
-                          onPressed: () {
-                            _searchController.text = suggestion;
-                            _searchController.selection = TextSelection.fromPosition(
-                              TextPosition(offset: suggestion.length),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                if (!isLast)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    indent: 48,
-                    endIndent: 16,
-                    color: isDark ? const Color(0xFF2C2C3F) : AppColors.border.withOpacity(0.5),
-                  ),
-              ],
+              ),
             );
           }).toList(),
         ),
@@ -419,59 +404,102 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildDidYouMean(BuildContext context) {
+  Widget _buildRecentSearchesSection(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    final recentSearchesAsync = ref.watch(recentSearchesStreamProvider);
 
-    return GestureDetector(
-      onTap: () {
-        _searchController.text = 'reluctant';
-        _performSearch('reluctant');
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.adaptiveSoftYellow(context),
-          borderRadius: BorderRadius.circular(24),
-          border: isDark
-              ? Border.all(color: AppColors.darkSoftYellowText.withOpacity(0.3), width: 1.5)
-              : null,
-        ),
-        child: Row(
+    return recentSearchesAsync.when(
+      data: (recents) {
+        if (recents.isEmpty) return const SizedBox.shrink();
+        final topRecents = recents.take(8).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(CupertinoIcons.lightbulb,
-                color: isDark ? AppColors.darkSoftYellowText : theme.primaryColor,
-                size: 28),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Try searching for',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark
-                              ? AppColors.darkSoftYellowText.withOpacity(0.8)
-                              : AppColors.textPrimary,
-                        ),
-                  ),
-                  Text(
-                    'RELUCTANT',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: isDark
-                              ? AppColors.darkSoftYellowText
-                              : AppColors.textPrimary,
-                        ),
-                  ),
-                ],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(CupertinoIcons.clock_fill,
+                        size: 16, color: primaryColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Recent Searches',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton(
+                  onPressed: () {
+                    ref.read(databaseProvider).clearRecentSearches();
+                  },
+                  child: const Text('Clear',
+                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                ),
+              ],
             ),
-            Icon(CupertinoIcons.chevron_right,
-                color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: topRecents.map((recent) {
+                return InkWell(
+                  onTap: () {
+                    _searchController.text = recent;
+                    _performSearch(recent);
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF222234) : Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF33334C) : const Color(0xFFE2E2E8),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          CupertinoIcons.time,
+                          size: 13,
+                          color: isDark ? Colors.white60 : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          recent,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ],
-        ),
-      ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -493,10 +521,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     final headword = entry.core.headword;
-    final pos = entry.core.partOfSpeech;
+    final pos = formatPartOfSpeech(entry.core.partOfSpeech);
     final phonetic = entry.core.phonetic;
     final firstSense = entry.senses.isNotEmpty ? entry.senses.first : null;
-    final def = firstSense?.definition ?? entry.lexiLens.simpleMeaning;
+    final def = firstSense?.definition ?? entry.dictionaryLayer.simpleMeaning;
 
     return Card(
       elevation: 0,

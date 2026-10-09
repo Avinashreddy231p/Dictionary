@@ -5,6 +5,12 @@ import '../screens/search/search_screen.dart';
 import '../screens/word_detail/word_detail_screen.dart';
 import '../screens/collections/collections_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/settings/sub_screens/appearance_settings_screen.dart';
+import '../screens/settings/sub_screens/gemini_settings_screen.dart';
+import '../screens/settings/sub_screens/audio_settings_screen.dart';
+import '../screens/settings/sub_screens/goals_settings_screen.dart';
+import '../screens/settings/sub_screens/storage_settings_screen.dart';
+import '../screens/settings/sub_screens/about_settings_screen.dart';
 import '../screens/stats/stats_screen.dart';
 import '../screens/flashcards/flashcard_screen.dart';
 import '../screens/quiz/quiz_screen.dart';
@@ -38,6 +44,36 @@ final goRouter = GoRouter(
       path: '/quiz',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const QuizScreen(),
+    ),
+    GoRoute(
+      path: '/settings/appearance',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AppearanceSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/settings/gemini',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const GeminiSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/settings/audio',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AudioSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/settings/goals',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const GoalsSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/settings/storage',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const StorageSettingsScreen(),
+    ),
+    GoRoute(
+      path: '/settings/about',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) => const AboutSettingsScreen(),
     ),
     GoRoute(
       path: '/word/:word',

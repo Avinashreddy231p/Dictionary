@@ -43,7 +43,7 @@ final wordOfTheDayProvider = FutureProvider<LexicalEntry?>((ref) async {
       ],
       grammar: GrammarData(verbDivision: '', usageNotes: [], inflections: [], relatedForms: []),
       linguistic: LinguisticData(etymology: 'Greek ephemeros', firstKnownUse: '16th century'),
-      lexiLens: LexiLensLayer(
+      dictionaryLayer: DictionaryLayer(
         simpleMeaning: 'Lasting for a very short time; fleeting.',
         contextualMeaning: 'Fleeting beauty or fame.',
         synonyms: ['fleeting', 'transitory', 'transient', 'momentary'],

@@ -1,6 +1,6 @@
 {
-    "name": "lexi_lens",
-    "short_name": "lexi_lens",
+    "name": "Dictionary",
+    "short_name": "Dictionary",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../../data/models/lexical_entry.dart';
@@ -408,7 +409,7 @@ class AppDatabase extends _$AppDatabase {
         etymology: primaryWord.etymology ?? 'English Dictionary',
         firstKnownUse: primaryWord.firstKnownUse ?? '',
       ),
-      lexiLens: LexiLensLayer(
+      dictionaryLayer: DictionaryLayer(
         simpleMeaning: mainDef,
         contextualMeaning: primaryWord.contextualMeaning ?? 'Offline backup dictionary definition.',
         synonyms: [],
@@ -469,7 +470,7 @@ class AppDatabase extends _$AppDatabase {
     return results;
   }
 
-  Future<List<String>> getOfflineSuggestions(String query, {int limit = 10}) async {
+  Future<List<String>> getOfflineSuggestions(String query, {int limit = 5}) async {
     final cleanQuery = query.trim().toLowerCase();
     if (cleanQuery.isEmpty) return [];
 
@@ -786,6 +787,14 @@ LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'dictionary_v2.sqlite'));
+    if (!await file.exists()) {
+      try {
+        final blob = await rootBundle.load('assets/offline_dictionary.db.gz');
+        final compressedBytes = blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);
+        final decompressedBytes = GZipCodec().decode(compressedBytes);
+        await file.writeAsBytes(decompressedBytes, flush: true);
+      } catch (_) {}
+    }
     return NativeDatabase.createInBackground(file);
   });
 }

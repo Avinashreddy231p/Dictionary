@@ -5,21 +5,21 @@ class AppColors {
   static const Color background = Color(0xFFFFF9EE);
   static const Color white = Color(0xFFFFFFFF);
 
-  // Core backgrounds (Dark - Pure AMOLED Black + Soft Card Surfaces)
-  static const Color darkBackground = Color(0xFF000000);
-  static const Color darkSurface = Color(0xFF161424);
-  static const Color darkBorder = Color(0xFF2E2942);
-  static const Color darkTileBg = Color(0xFF201D30);
+  // Core backgrounds (Dark - Premium Matte Charcoal & Dark Surfaces, as in Reference UI)
+  static const Color darkBackground = Color(0xFF141414);
+  static const Color darkSurface = Color(0xFF222222);
+  static const Color darkBorder = Color(0xFF2E2E2E);
+  static const Color darkTileBg = Color(0xFF181818);
 
   // Text Colors (Light)
   static const Color textPrimary = Color(0xFF1B1B26); // Dark indigo/black
   static const Color textSecondary = Color(0xFF6C6C7D); // Muted grey/indigo
   static const Color textDisabled = Color(0xFFA1A1AF);
 
-  // Text Colors (Dark - Soft Creamy Non-glare)
-  static const Color textPrimaryDark = Color(0xFFFAF7FF);
-  static const Color textSecondaryDark = Color(0xFFB3ADDC);
-  static const Color textDisabledDark = Color(0xFF7A7398);
+  // Text Colors (Dark - Off-white & Muted Grey)
+  static const Color textPrimaryDark = Color(0xFFEDEDED);
+  static const Color textSecondaryDark = Color(0xFFA0A0A0);
+  static const Color textDisabledDark = Color(0xFF666666);
 
   // Primary Accent
   static const Color primaryPurple = Color(0xFF6344FF); // Buttons, active tabs
@@ -39,21 +39,21 @@ class AppColors {
   static const Color illustrationPurple = Color(0xFFC7B8FF);
   static const Color buttonBlack = Color(0xFF1E1E1E);
 
-  // Soft, Warm & Cozy Dark Pastel Containers (Gentle Soft Bases + Creamy Pastel Labels)
-  static const Color darkHeaderYellow = Color(0xFF382B12);
-  static const Color darkHeaderYellowText = Color(0xFFFCE395); // Soft Sunshine Cream
-  static const Color darkSoftYellow = Color(0xFF332918);
-  static const Color darkSoftYellowText = Color(0xFFFCEBB6); // Soft Butter Cream
-  static const Color darkSoftPurple = Color(0xFF2E2345);
-  static const Color darkSoftPurpleText = Color(0xFFE4D7FA); // Soft Lilac Cream
-  static const Color darkSoftGreen = Color(0xFF1B2E24);
-  static const Color darkSoftGreenText = Color(0xFFC8F2D5); // Soft Sage Mint Cream
-  static const Color darkSoftBlue = Color(0xFF1C2740);
-  static const Color darkSoftBlueText = Color(0xFFCFE2FE); // Soft Powder Blue Cream
-  static const Color darkSoftPink = Color(0xFF341C2A);
-  static const Color darkSoftPinkText = Color(0xFFF9C8D4); // Soft Strawberry Cream
-  static const Color darkBadgeTeal = Color(0xFF172E2D);
-  static const Color darkBadgeTealText = Color(0xFFB8EBE6); // Soft Seafoam Cream
+  // Deep Muted Dark Container Colors (Matching Reference Screenshot Exactly)
+  static const Color darkHeaderYellow = Color(0xFF222222); // Outer header card surface
+  static const Color darkHeaderYellowText = Color(0xFFFFE8B6); // Warm cream meaning text
+  static const Color darkSoftYellow = Color(0xFF382D1B);
+  static const Color darkSoftYellowText = Color(0xFFFFE8B6); // Warm cream
+  static const Color darkSoftPurple = Color(0xFF382C48); // Deep muted violet
+  static const Color darkSoftPurpleText = Color(0xFFCBB7E2); // Soft lilac
+  static const Color darkSoftGreen = Color(0xFF2B4332); // Deep muted sage
+  static const Color darkSoftGreenText = Color(0xFF9FD4AC); // Soft mint
+  static const Color darkSoftBlue = Color(0xFF28384A); // Deep muted dusty blue
+  static const Color darkSoftBlueText = Color(0xFFA5C4E8); // Soft blue
+  static const Color darkSoftPink = Color(0xFF3D1E26); // Deep warm burgundy/maroon
+  static const Color darkSoftPinkText = Color(0xFFF5B7C4); // Soft rose pink
+  static const Color darkBadgeTeal = Color(0xFF1C3835);
+  static const Color darkBadgeTealText = Color(0xFF8FE0D6);
 
   // Gradients (Light)
   static const LinearGradient continueReadingGradient = LinearGradient(
@@ -68,15 +68,15 @@ class AppColors {
     end: Alignment.bottomCenter,
   );
 
-  // Gradients (Dark - AMOLED Deep Soft)
+  // Gradients (Dark)
   static const LinearGradient continueReadingGradientDark = LinearGradient(
-    colors: [Color(0xFF5B3288), Color(0xFF321B54)],
+    colors: [Color(0xFF4D226A), Color(0xFF2C133F)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient homeHeroGradientDark = LinearGradient(
-    colors: [Color(0xFF000000), Color(0xFF1C192E)],
+    colors: [Color(0xFF1D1D1D), Color(0xFF272727)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
