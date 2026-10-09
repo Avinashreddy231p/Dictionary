@@ -126,9 +126,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Listen for search double-tap / re-tap from bottom navigation bar
-    ref.listen<int>(searchFocusTriggerProvider, (previous, next) {
-      if (next != previous) {
+    // Listen for search single-tap / double-tap from bottom navigation bar
+    ref.listen<SearchFocusEvent>(searchFocusTriggerProvider, (previous, next) {
+      if (next.count != previous?.count) {
+        if (next.isDoubleTap) {
+          _searchController.clear();
+          _performSearch('');
+        }
         Future.delayed(const Duration(milliseconds: 100), () {
           _focusSearchField();
         });

@@ -104,16 +104,25 @@ final geminiServiceProvider = Provider<GeminiService>((ref) {
 });
 
 // Trigger to open keyboard on Search screen when Search bottom nav icon is tapped/double-tapped
-class SearchFocusNotifier extends Notifier<int> {
-  @override
-  int build() => 0;
+class SearchFocusEvent {
+  final int count;
+  final bool isDoubleTap;
 
-  void trigger() {
-    state++;
+  const SearchFocusEvent({required this.count, this.isDoubleTap = false});
+}
+
+class SearchFocusNotifier extends Notifier<SearchFocusEvent> {
+  @override
+  SearchFocusEvent build() => const SearchFocusEvent(count: 0, isDoubleTap: false);
+
+  void trigger({bool isDoubleTap = false}) {
+    state = SearchFocusEvent(count: state.count + 1, isDoubleTap: isDoubleTap);
   }
 }
 
-final searchFocusTriggerProvider = NotifierProvider<SearchFocusNotifier, int>(SearchFocusNotifier.new);
+final searchFocusTriggerProvider =
+    NotifierProvider<SearchFocusNotifier, SearchFocusEvent>(
+        SearchFocusNotifier.new);
 
 // Saved Words Providers
 final savedWordsStreamProvider = StreamProvider<List<SavedWord>>((ref) {
@@ -163,7 +172,8 @@ final wordsWithNotesStreamProvider = StreamProvider<List<SavedWord>>((ref) {
 
 final isWordSavedStreamProvider = StreamProvider.family<bool, String>((ref, word) {
   final db = ref.watch(databaseProvider);
-  return db.watchSavedWordByWord(word).map((saved) => saved != null);
+  return db.watchSavedWordByWord(word).map((saved) =>
+      saved != null && (saved.isFavorite || (saved.source != null && saved.source != 'Visited')));
 });
 
 final savedWordStreamProvider = StreamProvider.family<SavedWord?, String>((ref, word) {

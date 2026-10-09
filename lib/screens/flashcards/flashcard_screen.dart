@@ -422,7 +422,7 @@ class _FlashcardScreenState extends ConsumerState<FlashcardScreen>
                         const SizedBox(width: 12),
                         FilledButton.icon(
                           onPressed: () => context.go('/quiz'),
-                          icon: const Icon(CupertinoIcons.bolt_fill),
+                          icon: const Icon(CupertinoIcons.question_circle_fill),
                           label: const Text('Take Quiz'),
                         ),
                       ],

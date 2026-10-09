@@ -117,6 +117,7 @@ class AppDatabase extends _$AppDatabase {
 
   Stream<List<SavedWord>> watchRecentSavedWords({int limit = 10}) {
     return (select(savedWords)
+      ..where((t) => t.isFavorite.equals(true) | (t.source.isNotNull() & t.source.isNotValue('Visited')))
       ..orderBy([(t) => OrderingTerm.desc(t.dateAdded)])
       ..limit(limit)).watch();
   }
@@ -188,12 +189,28 @@ class AppDatabase extends _$AppDatabase {
     int reviewState = 0,
     bool isFavorite = false,
   }) async {
-    final existing = await getSavedWordByWord(word);
+    final cleanWord = word.trim().toLowerCase();
+    final existing = await getSavedWordByWord(cleanWord);
     if (existing != null) {
+      await (update(savedWords)..where((t) => t.id.equals(existing.id))).write(
+        SavedWordsCompanion(
+          phonetic: Value(phonetic ?? existing.phonetic),
+          partOfSpeech: Value(partOfSpeech ?? existing.partOfSpeech),
+          meaning: Value(meaning ?? existing.meaning),
+          example: Value(example ?? existing.example),
+          syllables: Value(syllables ?? existing.syllables),
+          cefr: Value(cefr ?? existing.cefr),
+          contextSentence: Value(contextSentence ?? existing.contextSentence),
+          personalNote: Value(personalNote ?? existing.personalNote),
+          source: Value(source ?? existing.source ?? 'Manual Save'),
+          reviewState: Value(reviewState),
+          isFavorite: Value(isFavorite || existing.isFavorite),
+        ),
+      );
       return existing.id;
     }
     return into(savedWords).insert(SavedWordsCompanion.insert(
-      word: word.toLowerCase(),
+      word: cleanWord,
       phonetic: Value(phonetic),
       partOfSpeech: Value(partOfSpeech),
       meaning: Value(meaning),
@@ -203,9 +220,52 @@ class AppDatabase extends _$AppDatabase {
       dateAdded: DateTime.now(),
       contextSentence: Value(contextSentence),
       personalNote: Value(personalNote),
-      source: Value(source),
+      source: Value(source ?? 'Manual Save'),
       reviewState: Value(reviewState),
       isFavorite: Value(isFavorite),
+    ));
+  }
+
+  Future<int> autoSaveVisitedWord({
+    required String word,
+    String? phonetic,
+    String? partOfSpeech,
+    String? meaning,
+    String? example,
+    String? syllables,
+    String? cefr,
+    String? source = 'Visited',
+  }) async {
+    final cleanWord = word.trim().toLowerCase();
+    if (cleanWord.isEmpty) return -1;
+
+    final existing = await getSavedWordByWord(cleanWord);
+    if (existing != null) {
+      await (update(savedWords)..where((t) => t.id.equals(existing.id))).write(
+        SavedWordsCompanion(
+          phonetic: existing.phonetic == null && phonetic != null ? Value(phonetic) : const Value.absent(),
+          partOfSpeech: existing.partOfSpeech == null && partOfSpeech != null ? Value(partOfSpeech) : const Value.absent(),
+          meaning: existing.meaning == null && meaning != null ? Value(meaning) : const Value.absent(),
+          example: existing.example == null && example != null ? Value(example) : const Value.absent(),
+          syllables: existing.syllables == null && syllables != null ? Value(syllables) : const Value.absent(),
+          cefr: existing.cefr == null && cefr != null ? Value(cefr) : const Value.absent(),
+          dateAdded: Value(DateTime.now()),
+        ),
+      );
+      return existing.id;
+    }
+
+    return into(savedWords).insert(SavedWordsCompanion.insert(
+      word: cleanWord,
+      phonetic: Value(phonetic),
+      partOfSpeech: Value(partOfSpeech),
+      meaning: Value(meaning),
+      example: Value(example),
+      syllables: Value(syllables),
+      cefr: Value(cefr ?? 'B2'),
+      dateAdded: DateTime.now(),
+      source: Value(source ?? 'Visited'),
+      isFavorite: const Value(false),
     ));
   }
 

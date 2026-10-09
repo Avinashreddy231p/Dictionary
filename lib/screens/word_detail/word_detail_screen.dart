@@ -90,9 +90,39 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   void _logWordVisited() {
-    final word = widget.entry?.core.headword ?? widget.initialWord;
+    final active = _activeEntry;
+    final word = active?.core.headword ?? widget.entry?.core.headword ?? widget.initialWord;
     if (word != null && word.trim().isNotEmpty) {
-      ref.read(databaseProvider).addRecentSearch(word.trim().toLowerCase());
+      final cleanWord = word.trim().toLowerCase();
+      final db = ref.read(databaseProvider);
+      db.addRecentSearch(cleanWord);
+
+      final sense = active?.senses.isNotEmpty == true
+          ? active!.senses.first
+          : widget.entry?.senses.isNotEmpty == true
+              ? widget.entry!.senses.first
+              : null;
+
+      final phonetic = active?.core.phonetic ?? widget.entry?.core.phonetic;
+      final pos = active?.core.partOfSpeech ?? widget.entry?.core.partOfSpeech;
+      final meaning = active?.dictionaryLayer.simpleMeaning ?? sense?.definition;
+      final example = sense?.examples.isNotEmpty == true ? sense!.examples.first : null;
+      final syllables = active?.core.syllables.isNotEmpty == true
+          ? active!.core.syllables.join('*')
+          : widget.entry?.core.syllables.isNotEmpty == true
+              ? widget.entry!.core.syllables.join('*')
+              : null;
+
+      db.autoSaveVisitedWord(
+        word: cleanWord,
+        phonetic: phonetic,
+        partOfSpeech: pos,
+        meaning: meaning,
+        example: example,
+        syllables: syllables,
+        cefr: 'B2',
+        source: 'Visited',
+      );
     }
   }
 
@@ -114,6 +144,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           setState(() {
             _fetchedEntry = results.first;
           });
+          _logWordVisited();
         }
       } catch (_) {}
       if (mounted) setState(() => _isLoadingWord = false);
@@ -276,7 +307,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       final word = entry.core.headword.toLowerCase();
       final saved = await db.getSavedWordByWord(word);
 
-      if (saved != null) {
+      final isExplicitlySaved = saved != null &&
+          (saved.isFavorite || (saved.source != null && saved.source != 'Visited'));
+
+      if (isExplicitlySaved) {
         if (!mounted) return;
         _showCollectionsSheet(context, ref, saved);
       } else {
@@ -292,6 +326,8 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           example: example,
           syllables: entry.core.syllables.join('*'),
           cefr: 'B2',
+          isFavorite: true,
+          source: 'Manual Save',
         );
 
         final newSaved = await db.getSavedWordByWord(word);

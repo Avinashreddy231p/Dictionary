@@ -1007,7 +1007,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _buildActionCard(
               context,
               'Quiz Mode',
-              CupertinoIcons.bolt_fill,
+              CupertinoIcons.question_circle_fill,
               isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
               isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
               onTap: () => context.push('/quiz'),

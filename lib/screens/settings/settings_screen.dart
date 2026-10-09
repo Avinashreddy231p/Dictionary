@@ -175,7 +175,7 @@ class SettingsScreen extends ConsumerWidget {
                           icon: CupertinoIcons.info_circle,
                           title: 'About, Terms & Privacy',
                           subtitle: 'Version info, open source licenses & reset',
-                          badgeText: 'v1.0.0',
+                          badgeText: 'v2.3.1',
                           onTap: () => context.push('/settings/about'),
                           isDark: isDark,
                           primaryColor: primaryColor,
@@ -625,7 +625,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Version 1.0.0 • Riverpod & Merriam-Webster Engine',
+            'Version 2.3.1 • Created by PARKER (Batch H1)',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
           ),
         ],

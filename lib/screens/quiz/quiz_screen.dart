@@ -386,7 +386,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(CupertinoIcons.bolt_fill, size: 12, color: Color(0xFFFFB800)),
+                                      const Icon(CupertinoIcons.star_fill, size: 12, color: Color(0xFFFFB800)),
                                       const SizedBox(width: 3),
                                       Text(
                                         'SCORE',

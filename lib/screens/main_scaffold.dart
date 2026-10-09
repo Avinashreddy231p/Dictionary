@@ -22,16 +22,28 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final now = DateTime.now();
 
     if (index == 0) {
-      _lastSearchTap = now;
+      if (currentIndex != 0) {
+        // Tapping from another tab (e.g. Collections or Settings) goes directly to Home Screen (/home)
+        _lastSearchTap = now;
+        widget.navigationShell.goBranch(0, initialLocation: false);
+        return;
+      }
 
-      // Navigate to /home/search route directly
+      // Already on Home tab (currentIndex == 0)
+      final isDoubleTap = _lastSearchTap != null &&
+          now.difference(_lastSearchTap!) < const Duration(milliseconds: 400);
+
+      _lastSearchTap = isDoubleTap ? null : now;
+
+      // Navigate to /home/search route
       context.go('/home/search');
 
-      // Trigger focus and keyboard popup in SearchScreen
-      ref.read(searchFocusTriggerProvider.notifier).trigger();
+      // Trigger focus and keyboard popup in SearchScreen, clearing query if double-tapped
+      ref.read(searchFocusTriggerProvider.notifier).trigger(isDoubleTap: isDoubleTap);
       return;
     }
 
+    _lastSearchTap = null;
     widget.navigationShell.goBranch(
       index,
       initialLocation: index == currentIndex,
