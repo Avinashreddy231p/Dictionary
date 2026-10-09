@@ -35,8 +35,8 @@ class SettingsState {
 
   const SettingsState({
     this.themeMode = ThemeMode.system,
-    this.accentColor = const Color(0xFFFFBE98),
-    this.fontScale = 1.0,
+    this.accentColor = const Color(0xFFD97706), // Amber Gold
+    this.fontScale = 1.25,
     this.preferredAccent = 'US',
     this.autoPlayAudio = true,
     this.audioSpeed = 1.0,
@@ -55,11 +55,11 @@ class SettingsState {
     this.themeVariant = 'standard',
     this.showBgBlobs = true,
     this.bgTexture = 'dots',
-    this.bgTextureOpacity = 0.8,
-    this.appFontFamily = 'Nunito',
-    this.cardRadiusStyle = 'rounded',
-    this.borderWidthStyle = 'standard',
-    this.searchBarShape = 'pill',
+    this.bgTextureOpacity = 0.5,
+    this.appFontFamily = 'SF Pro Rounded',
+    this.cardRadiusStyle = 'pill',
+    this.borderWidthStyle = 'thin',
+    this.searchBarShape = 'roundedBox',
     this.definitionDensity = 'spacious',
     this.enableAnimations = true,
     this.cardShadowStyle = 'soft',

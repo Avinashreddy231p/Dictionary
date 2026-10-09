@@ -967,65 +967,110 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       );
     }
 
+    final entriesList = posMap.entries.toList();
+
     return _buildCardContainer(
       isDark: isDark,
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: posMap.entries.map((e) {
-            final pos = e.key;
-            final wordsList = e.value;
-
-            return InkWell(
-              onTap: () {
-                _showPartsOfSpeechBottomSheet(context, pos, wordsList, primaryColor, isDark);
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF383852) : AppColors.border,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      pos.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        color: primaryColor,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  for (int i = 0; i < entriesList.length; i += 2)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: _buildPosTile(
+                        context,
+                        entriesList[i].key,
+                        entriesList[i].value,
+                        primaryColor,
+                        isDark,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        '${wordsList.length}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                ],
+              ),
+              if (entriesList.length > 1) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    for (int i = 1; i < entriesList.length; i += 2)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child: _buildPosTile(
+                          context,
+                          entriesList[i].key,
+                          entriesList[i].value,
+                          primaryColor,
+                          isDark,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(CupertinoIcons.chevron_right, size: 12, color: primaryColor),
                   ],
                 ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPosTile(
+    BuildContext context,
+    String pos,
+    List<SavedWord> wordsList,
+    Color primaryColor,
+    bool isDark,
+  ) {
+    return InkWell(
+      onTap: () {
+        _showPartsOfSpeechBottomSheet(context, pos, wordsList, primaryColor, isDark);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF27273C) : AppColors.softPurple.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark ? const Color(0xFF383852) : AppColors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              pos.toUpperCase(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+                color: primaryColor,
               ),
-            );
-          }).toList(),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: primaryColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${wordsList.length}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(CupertinoIcons.chevron_right, size: 12, color: primaryColor),
+          ],
         ),
       ),
     );

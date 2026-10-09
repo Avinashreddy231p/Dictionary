@@ -61,9 +61,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
         : ThemeMode.system;
 
     final accentVal = _prefs.getInt(_keyAccentColor);
-    final accentColor = accentVal != null ? Color(accentVal) : const Color(0xFFFFBE98);
+    final accentColor = accentVal != null ? Color(accentVal) : const Color(0xFFD97706);
 
-    final fontScale = _prefs.getDouble(_keyFontScale) ?? 1.0;
+    final fontScale = _prefs.getDouble(_keyFontScale) ?? 1.25;
     final preferredAccent = _prefs.getString(_keyPreferredAccent) ?? 'US';
     final autoPlayAudio = _prefs.getBool(_keyAutoPlayAudio) ?? true;
     final audioSpeed = _prefs.getDouble(_keyAudioSpeed) ?? 1.0;
@@ -82,11 +82,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final themeVariant = _prefs.getString(_keyThemeVariant) ?? 'standard';
     final showBgBlobs = _prefs.getBool(_keyShowBgBlobs) ?? true;
     final bgTexture = _prefs.getString(_keyBgTexture) ?? 'dots';
-    final bgTextureOpacity = _prefs.getDouble(_keyBgTextureOpacity) ?? 0.8;
-    final appFontFamily = _prefs.getString(_keyAppFontFamily) ?? 'Nunito';
-    final cardRadiusStyle = _prefs.getString(_keyCardRadiusStyle) ?? 'rounded';
-    final borderWidthStyle = _prefs.getString(_keyBorderWidthStyle) ?? 'standard';
-    final searchBarShape = _prefs.getString(_keySearchBarShape) ?? 'pill';
+    final bgTextureOpacity = _prefs.getDouble(_keyBgTextureOpacity) ?? 0.5;
+    final appFontFamily = _prefs.getString(_keyAppFontFamily) ?? 'SF Pro Rounded';
+    final cardRadiusStyle = _prefs.getString(_keyCardRadiusStyle) ?? 'pill';
+    final borderWidthStyle = _prefs.getString(_keyBorderWidthStyle) ?? 'thin';
+    final searchBarShape = _prefs.getString(_keySearchBarShape) ?? 'roundedBox';
     final definitionDensity = _prefs.getString(_keyDefinitionDensity) ?? 'spacious';
     final enableAnimations = _prefs.getBool(_keyEnableAnimations) ?? true;
     final cardShadowStyle = _prefs.getString(_keyCardShadowStyle) ?? 'soft';

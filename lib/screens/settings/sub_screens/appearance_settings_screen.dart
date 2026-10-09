@@ -3,12 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../data/models/settings_state.dart';
 import '../../../theme/app_accents.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_theme.dart';
 
-class AppearanceSettingsScreen extends ConsumerWidget {
+class AppearanceSettingsScreen extends ConsumerStatefulWidget {
   const AppearanceSettingsScreen({super.key});
+
+  @override
+  ConsumerState<AppearanceSettingsScreen> createState() =>
+      _AppearanceSettingsScreenState();
+}
+
+class _AppearanceSettingsScreenState
+    extends ConsumerState<AppearanceSettingsScreen> {
+  String _selectedAccentCategory = 'All';
+  String _pantoneSearchQuery = '';
+  late TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _showFeedback(BuildContext context, String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -28,13 +52,88 @@ class AppearanceSettingsScreen extends ConsumerWidget {
     return 'Extra Large (130%)';
   }
 
+  List<Color> _getCategoryGradient(String category) {
+    switch (category) {
+      case 'Purples':
+        return [const Color(0xFF6344FF), const Color(0xFFC026D3)];
+      case 'Blues':
+        return [const Color(0xFF2563EB), const Color(0xFF0D9488)];
+      case 'Greens':
+        return [const Color(0xFF059669), const Color(0xFF88B04B)];
+      case 'Yellows':
+        return [const Color(0xFFD97706), const Color(0xFFE0BB10)];
+      case 'Oranges':
+        return [const Color(0xFFEA580C), const Color(0xFFFF7854)];
+      case 'Pinks & Reds':
+        return [const Color(0xFFE11D48), const Color(0xFFBB2649)];
+      case 'Earth & Neutrals':
+        return [const Color(0xFF9B6B56), const Color(0xFF1E293B)];
+      case 'All':
+      default:
+        return [
+          const Color(0xFF6344FF),
+          const Color(0xFF2563EB),
+          const Color(0xFF059669),
+          const Color(0xFFEA580C),
+          const Color(0xFFE11D48),
+        ];
+    }
+  }
+
+  Color _getCategorySolidColor(String category, Color defaultPrimary) {
+    switch (category) {
+      case 'Purples':
+        return const Color(0xFF6344FF);
+      case 'Blues':
+        return const Color(0xFF2563EB);
+      case 'Greens':
+        return const Color(0xFF059669);
+      case 'Yellows':
+        return const Color(0xFFD97706);
+      case 'Oranges':
+        return const Color(0xFFEA580C);
+      case 'Pinks & Reds':
+        return const Color(0xFFE11D48);
+      case 'Earth & Neutrals':
+        return const Color(0xFF9B6B56);
+      case 'All':
+      default:
+        return defaultPrimary;
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
+
+    const categories = [
+      'All',
+      'Purples',
+      'Blues',
+      'Greens',
+      'Yellows',
+      'Oranges',
+      'Pinks & Reds',
+      'Earth & Neutrals',
+    ];
+
+    final categoryFiltered = _selectedAccentCategory == 'All'
+        ? AppAccent.presets
+        : AppAccent.presets
+            .where((a) => a.category == _selectedAccentCategory)
+            .toList();
+
+    final filteredPresets = _pantoneSearchQuery.isEmpty
+        ? categoryFiltered
+        : categoryFiltered
+            .where((a) =>
+                a.name.toLowerCase().contains(_pantoneSearchQuery.toLowerCase()) ||
+                a.code.toLowerCase().contains(_pantoneSearchQuery.toLowerCase()))
+            .toList();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -581,6 +680,8 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // --- OFFICIAL PANTONE PALETTE PRESETS (ORGANIZED IN 4 ROWS WITH HORIZONTAL SCROLL, VARYING SIZES & SEARCH FILTERS) ---
               Text(
                 'Official Pantone Palette Presets',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -589,122 +690,222 @@ class AppearanceSettingsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Curated Pantone Color of the Year & Iconic Palette Colors',
+                'Curated Pantone Color of the Year & Iconic Palette Colors (63 Total)',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
+
+              // Quick Search Input
+              Container(
+                height: 46,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1C2C) : Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF2C2C3F) : AppColors.border,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 14),
+                    Icon(
+                      CupertinoIcons.search,
+                      size: 18,
+                      color: isDark ? Colors.white54 : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _pantoneSearchQuery = val;
+                          });
+                        },
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search 63 Pantone colors...',
+                          hintStyle: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : AppColors.textSecondary,
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                      ),
+                    ),
+                    if (_pantoneSearchQuery.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(CupertinoIcons.clear_circled_solid, size: 16),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _pantoneSearchQuery = '';
+                          });
+                        },
+                      ),
+                    const SizedBox(width: 6),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Category Swatch Filter Pills
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: categories.length,
+                  separatorBuilder: (context, index) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = _selectedAccentCategory == category;
+                    final count = category == 'All'
+                        ? AppAccent.presets.length
+                        : AppAccent.presets.where((a) => a.category == category).length;
+
+                    return _buildCreativeCategoryPill(
+                      category: category,
+                      count: count,
+                      isSelected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _selectedAccentCategory = category;
+                        });
+                      },
+                      primaryColor: primaryColor,
+                      isDark: isDark,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 4-Row Horizontal Scroll Grid with Varying Sizes
               _buildCardContainer(
                 context: context,
                 isDark: isDark,
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: AppAccent.presets.map((accent) {
-                      final isSelected =
-                          settings.accentColor.value == accent.primary.value;
-                      return InkWell(
-                        onTap: () {
-                          settingsNotifier.setAccentColor(accent.primary);
-                          _showFeedback(context, 'Accent color set to ${accent.name} (${accent.code})');
-                        },
-                        borderRadius: BorderRadius.circular(16),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? accent.primary
-                                : accent.adaptiveSoft(context),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isSelected
-                                  ? accent.primary
-                                  : (isDark
-                                      ? accent.darkSoftText.withOpacity(0.3)
-                                      : AppColors.border),
-                              width: isSelected ? 2 : 1.5,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: accent.primary.withOpacity(0.35),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? Colors.white : accent.primary,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    child: isSelected
-                                        ? Icon(
-                                            Icons.check,
-                                            size: 10,
-                                            color: accent.primary,
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    accent.name,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w900
-                                          : FontWeight.w700,
-                                      color: isSelected
-                                          ? Colors.white
-                                          : (isDark
-                                              ? Colors.white
-                                              : AppColors.textPrimary),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 20),
-                                child: Text(
-                                  accent.code,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: filteredPresets.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(CupertinoIcons.color_filter,
+                                    size: 28,
+                                    color: isDark ? Colors.white38 : Colors.black38),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'No Pantone color found for "$_pantoneSearchQuery"',
                                   style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w800,
-                                    color: isSelected
-                                        ? Colors.white.withOpacity(0.85)
-                                        : (isDark
-                                            ? Colors.white54
-                                            : AppColors.textSecondary),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white54 : AppColors.textSecondary,
                                   ),
                                 ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  for (int i = 0; i < filteredPresets.length; i += 4)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 10),
+                                      child: _buildVaryingAccentTile(
+                                        context: context,
+                                        accent: filteredPresets[i],
+                                        isDark: isDark,
+                                        settings: settings,
+                                        settingsNotifier: settingsNotifier,
+                                        index: i,
+                                      ),
+                                    ),
+                                ],
                               ),
+                              if (filteredPresets.length > 1) ...[
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    for (int i = 1; i < filteredPresets.length; i += 4)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 10),
+                                        child: _buildVaryingAccentTile(
+                                          context: context,
+                                          accent: filteredPresets[i],
+                                          isDark: isDark,
+                                          settings: settings,
+                                          settingsNotifier: settingsNotifier,
+                                          index: i,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                              if (filteredPresets.length > 2) ...[
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    for (int i = 2; i < filteredPresets.length; i += 4)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 10),
+                                        child: _buildVaryingAccentTile(
+                                          context: context,
+                                          accent: filteredPresets[i],
+                                          isDark: isDark,
+                                          settings: settings,
+                                          settingsNotifier: settingsNotifier,
+                                          index: i,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                              if (filteredPresets.length > 3) ...[
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    for (int i = 3; i < filteredPresets.length; i += 4)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 10),
+                                        child: _buildVaryingAccentTile(
+                                          context: context,
+                                          accent: filteredPresets[i],
+                                          isDark: isDark,
+                                          settings: settings,
+                                          settingsNotifier: settingsNotifier,
+                                          index: i,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                      );
-                    }).toList(),
-                  ),
                 ),
               ),
               const SizedBox(height: 24),
+
               Text(
                 'Background Texture Pattern',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -1007,6 +1208,201 @@ class AppearanceSettingsScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildCreativeCategoryPill({
+    required String category,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Color primaryColor,
+    required bool isDark,
+  }) {
+    final gradientColors = _getCategoryGradient(category);
+    final solidCategoryColor = _getCategorySolidColor(category, primaryColor);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? solidCategoryColor
+              : (isDark
+                  ? const Color(0xFF1C1C2C)
+                  : const Color(0xFFF3F4F6)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? solidCategoryColor
+                : (isDark ? Colors.white12 : AppColors.border),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: isSelected
+                      ? [Colors.white, Colors.white]
+                      : gradientColors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: isSelected
+                    ? Border.all(color: Colors.white, width: 1.5)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              category,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w900 : FontWeight.w700,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? Colors.white70 : AppColors.textPrimary),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.25)
+                    : (isDark ? Colors.white10 : Colors.black.withOpacity(0.06)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.white54 : AppColors.textSecondary),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVaryingAccentTile({
+    required BuildContext context,
+    required AppAccent accent,
+    required bool isDark,
+    required SettingsState settings,
+    required SettingsNotifier settingsNotifier,
+    required int index,
+  }) {
+    final isSelected = settings.accentColor.value == accent.primary.value;
+    final itemWidth = (index % 3 == 0) ? 172.0 : 148.0;
+
+    return InkWell(
+      onTap: () {
+        settingsNotifier.setAccentColor(accent.primary);
+        _showFeedback(
+            context, 'Accent color set to ${accent.name} (${accent.code})');
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: itemWidth,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? accent.primary : accent.adaptiveSoft(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? accent.primary
+                : (isDark
+                    ? accent.darkSoftText.withOpacity(0.3)
+                    : AppColors.border),
+            width: isSelected ? 2 : 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: accent.primary.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.white : accent.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: isSelected
+                      ? Icon(
+                          Icons.check,
+                          size: 10,
+                          color: accent.primary,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    accent.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.w900 : FontWeight.w700,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white : AppColors.textPrimary),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(
+                accent.code,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? Colors.white.withOpacity(0.85)
+                      : (isDark ? Colors.white54 : AppColors.textSecondary),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCardContainer({required Widget child, required bool isDark, BuildContext? context}) {
     final radius = context != null ? AppTheme.cardRadius(context) : 24.0;
     final strokeWidth = context != null ? AppTheme.borderWidth(context) : 1.5;
@@ -1021,6 +1417,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: cardBgColor,
         borderRadius: BorderRadius.circular(radius),
