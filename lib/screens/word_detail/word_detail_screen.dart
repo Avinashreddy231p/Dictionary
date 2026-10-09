@@ -76,8 +76,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _logWordVisited();
-    _loadExtraWordData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _logWordVisited();
+        _loadExtraWordData();
+      }
+    });
   }
 
   @override
@@ -136,11 +140,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
   void _loadExtraWordData() async {
     if (widget.entry == null && widget.initialWord != null && widget.initialWord!.isNotEmpty) {
-      setState(() => _isLoadingWord = true);
+      if (mounted) setState(() => _isLoadingWord = true);
       try {
         final repo = ref.read(wordRepositoryProvider);
         final results = await repo.searchWord(widget.initialWord!);
-        if (results.isNotEmpty) {
+        if (results.isNotEmpty && mounted) {
           setState(() {
             _fetchedEntry = results.first;
           });
@@ -159,50 +163,57 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final existingAnts = active.dictionaryLayer.antonyms;
 
     if (existingSyns.isNotEmpty || existingAnts.isNotEmpty) {
-      setState(() {
-        _fetchedSynonyms = existingSyns;
-        _fetchedAntonyms = existingAnts;
-      });
+      if (mounted) {
+        setState(() {
+          _fetchedSynonyms = existingSyns;
+          _fetchedAntonyms = existingAnts;
+        });
+      }
     }
 
-    setState(() => _isFetchingSynonyms = true);
+    if (mounted) setState(() => _isFetchingSynonyms = true);
 
     try {
-      // 1. Datamuse Synonyms
-      if (_fetchedSynonyms.isEmpty) {
-        final synRes = await http.get(Uri.parse('https://api.datamuse.com/words?rel_syn=$word'));
-        if (synRes.statusCode == 200) {
-          final data = json.decode(synRes.body) as List;
-          _fetchedSynonyms = data.take(8).map((e) => e['word'].toString()).toList();
-        }
-      }
+      final results = await Future.wait([
+        if (_fetchedSynonyms.isEmpty)
+          http.get(Uri.parse('https://api.datamuse.com/words?rel_syn=$word')).timeout(const Duration(seconds: 3))
+        else
+          Future.value(null),
+        if (_fetchedAntonyms.isEmpty)
+          http.get(Uri.parse('https://api.datamuse.com/words?rel_ant=$word')).timeout(const Duration(seconds: 3))
+        else
+          Future.value(null),
+        http.get(Uri.parse('https://api.datamuse.com/words?rel_jja=$word')).timeout(const Duration(seconds: 3)),
+      ]).catchError((_) => <http.Response?>[null, null, null]);
 
-      // 2. Datamuse Antonyms
-      if (_fetchedAntonyms.isEmpty) {
-        final antRes = await http.get(Uri.parse('https://api.datamuse.com/words?rel_ant=$word'));
-        if (antRes.statusCode == 200) {
-          final data = json.decode(antRes.body) as List;
-          _fetchedAntonyms = data.take(5).map((e) => e['word'].toString()).toList();
-        }
-      }
+      if (!mounted) return;
 
-      // 3. Datamuse Collocations / Word Pairings
-      final pairRes = await http.get(Uri.parse('https://api.datamuse.com/words?rel_jja=$word'));
+      List<String> syns = List.from(_fetchedSynonyms);
+      List<String> ants = List.from(_fetchedAntonyms);
       List<String> pairs = [];
-      if (pairRes.statusCode == 200) {
+
+      final synRes = results.isNotEmpty ? results[0] : null;
+      if (synRes != null && synRes.statusCode == 200) {
+        final data = json.decode(synRes.body) as List;
+        syns = data.take(8).map((e) => e['word'].toString()).toList();
+      }
+
+      final antRes = results.length > 1 ? results[1] : null;
+      if (antRes != null && antRes.statusCode == 200) {
+        final data = json.decode(antRes.body) as List;
+        ants = data.take(5).map((e) => e['word'].toString()).toList();
+      }
+
+      final pairRes = results.length > 2 ? results[2] : null;
+      if (pairRes != null && pairRes.statusCode == 200) {
         final data = json.decode(pairRes.body) as List;
         pairs.addAll(data.take(4).map((e) => '$word ${e['word']}'));
-      }
-      if (pairs.length < 3) {
-        final pairRes2 = await http.get(Uri.parse('https://api.datamuse.com/words?rel_jjb=$word'));
-        if (pairRes2.statusCode == 200) {
-          final data = json.decode(pairRes2.body) as List;
-          pairs.addAll(data.take(4).map((e) => '${e['word']} $word'));
-        }
       }
 
       if (mounted) {
         setState(() {
+          _fetchedSynonyms = syns;
+          _fetchedAntonyms = ants;
           _fetchedPairings = pairs.toSet().toList();
           _isFetchingSynonyms = false;
         });
@@ -3317,13 +3328,14 @@ class _FluidAnimatedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 300 + (index * 30).clamp(0, 300)),
+      duration: Duration(milliseconds: 150 + (index * 20).clamp(0, 150)),
       tween: Tween<double>(begin: 0.0, end: 1.0),
       builder: (context, value, child) {
+        if (value >= 1.0) return child!;
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, 8 * (1.0 - value)),
+            offset: Offset(0, 6 * (1.0 - value)),
             child: child,
           ),
         );

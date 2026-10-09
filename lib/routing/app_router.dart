@@ -104,6 +104,15 @@ final goRouter = GoRouter(
       },
       branches: [
         StatefulShellBranch(
+          navigatorKey: _collectionsNavigatorKey,
+          routes: [
+            GoRoute(
+              path: '/collections',
+              builder: (context, state) => const CollectionsScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
           navigatorKey: _homeNavigatorKey,
           routes: [
             GoRoute(
@@ -126,15 +135,6 @@ final goRouter = GoRouter(
                   ],
                 ),
               ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          navigatorKey: _collectionsNavigatorKey,
-          routes: [
-            GoRoute(
-              path: '/collections',
-              builder: (context, state) => const CollectionsScreen(),
             ),
           ],
         ),

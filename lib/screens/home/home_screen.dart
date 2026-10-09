@@ -1168,14 +1168,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: InkWell(
-                        onTap: () async {
-                          final repo = ref.read(wordRepositoryProvider);
-                          final results = await repo.searchWord(word);
-                          if (results.isNotEmpty && context.mounted) {
-                            context.push('/home/search/detail', extra: results.first);
-                          } else if (context.mounted) {
-                            context.go('/home/search');
-                          }
+                        onTap: () {
+                          context.push('/word/${Uri.encodeComponent(word)}');
                         },
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
@@ -1276,49 +1270,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final example = todayWord?.example ??
                 'The serene landscape brought a deep sense of peace.';
 
+            final entryToPass = LexicalEntry(
+              core: CoreData(
+                headword: wordTitle,
+                homograph: 0,
+                partOfSpeech: pos,
+                phonetic: phonetic,
+                audioUrl: '',
+                syllables: todayWord?.syllables?.split('*') ?? [wordTitle],
+              ),
+              senses: [
+                Sense(
+                  senseNumber: '1',
+                  definition: meaning,
+                  examples: example.isNotEmpty ? [example] : [],
+                  labels: [],
+                )
+              ],
+              grammar: GrammarData(
+                verbDivision: '',
+                usageNotes: [],
+                inflections: [],
+                relatedForms: [],
+              ),
+              linguistic: LinguisticData(
+                etymology: '',
+                firstKnownUse: '',
+              ),
+              dictionaryLayer: DictionaryLayer(
+                simpleMeaning: meaning,
+                contextualMeaning: todayWord?.contextSentence ?? example,
+                synonyms: [],
+                antonyms: [],
+              ),
+            );
+
             return InkWell(
-              onTap: () async {
-                final repo = ref.read(wordRepositoryProvider);
-                final results = await repo.searchWord(wordTitle);
-                if (results.isNotEmpty && context.mounted) {
-                  context.push('/home/search/detail', extra: results.first);
-                } else if (todayWord != null && context.mounted) {
-                  final fallbackEntry = LexicalEntry(
-                    core: CoreData(
-                      headword: todayWord.word,
-                      homograph: 0,
-                      partOfSpeech: todayWord.partOfSpeech ?? 'word',
-                      phonetic: todayWord.phonetic ?? '',
-                      audioUrl: '',
-                      syllables: todayWord.syllables?.split('*') ?? [todayWord.word],
-                    ),
-                    senses: [
-                      Sense(
-                        senseNumber: '1',
-                        definition: todayWord.meaning ?? 'Vocabulary word',
-                        examples: todayWord.example != null ? [todayWord.example!] : [],
-                        labels: [],
-                      )
-                    ],
-                    grammar: GrammarData(
-                      verbDivision: '',
-                      usageNotes: [],
-                      inflections: [],
-                      relatedForms: [],
-                    ),
-                    linguistic: LinguisticData(
-                      etymology: '',
-                      firstKnownUse: '',
-                    ),
-                    dictionaryLayer: DictionaryLayer(
-                      simpleMeaning: todayWord.meaning ?? 'Vocabulary word',
-                      contextualMeaning: todayWord.contextSentence ?? '',
-                      synonyms: [],
-                      antonyms: [],
-                    ),
-                  );
-                  context.push('/home/search/detail', extra: fallbackEntry);
-                }
+              onTap: () {
+                context.push('/home/search/detail', extra: entryToPass);
               },
               borderRadius: BorderRadius.circular(24),
               child: Container(
@@ -1476,8 +1465,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return userColsAsync.when(
       data: (cols) {
         final activeCol = cols.isNotEmpty ? cols.first : null;
-        final title = activeCol?.title ?? 'The Great Gatsby';
-        final desc = activeCol?.description ?? 'Chapter 3 • Vocabulary reading';
+        final title = activeCol?.title ?? 'Advanced Vocabulary';
+        final desc = activeCol?.description ?? 'Curated C1 & C2 level terms for advanced mastery';
 
         return InkWell(
           onTap: () {

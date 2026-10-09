@@ -44,11 +44,10 @@ class _PronunciationPracticeWidgetState
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
-    _initSpeech();
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    );
   }
 
   Future<bool> _initSpeech({bool forceReinit = false}) async {
@@ -160,6 +159,7 @@ class _PronunciationPracticeWidgetState
         _hasVerified = false;
         _soundLevel = 0.0;
       });
+      _pulseController.repeat(reverse: true);
     }
 
     // 3. Listen with SpeechToText given exclusive mic access
@@ -203,6 +203,9 @@ class _PronunciationPracticeWidgetState
 
     if (!mounted) return;
 
+    _pulseController.stop();
+    _pulseController.reset();
+
     if (_recognizedWords.trim().isNotEmpty) {
       _evaluateAndFinishSpeech();
     } else {
@@ -226,6 +229,9 @@ class _PronunciationPracticeWidgetState
     try {
       await _speech.stop();
     } catch (_) {}
+
+    _pulseController.stop();
+    _pulseController.reset();
 
     if (!mounted) return;
 

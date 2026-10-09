@@ -877,12 +877,12 @@ class AppDatabase extends _$AppDatabase {
     final count = await select(savedWords).get().then((v) => v.length);
     if (count == 0) {
       // Seed Collections
-      final gatsbyColId = await createCollection(
-        title: 'The Great Gatsby',
-        description: 'Key vocabulary encountered while reading Chapter 3',
+      final advancedColId = await createCollection(
+        title: 'Advanced Vocabulary',
+        description: 'Curated C1 & C2 level terms for advanced mastery & nuance',
         colorHex: '0xFFE5D4FF',
-        iconName: 'book',
-        tags: 'Book, Fiction, Classic',
+        iconName: 'sparkles',
+        tags: 'Advanced, C1, C2, Nuance',
       );
       final forgetColId = await createCollection(
         title: 'Words I Keep Forgetting',
@@ -898,39 +898,32 @@ class AppDatabase extends _$AppDatabase {
         iconName: 'flag',
         tags: 'Exam, IELTS, Academic',
       );
-      final hpColId = await createCollection(
-        title: 'Harry Potter',
-        description: 'Magical and literary descriptions',
-        colorHex: '0xFFD4E3FF',
-        iconName: 'sparkles',
-        tags: 'Book, Magic, Literature',
-      );
 
       // Seed Saved Words
       final w1 = await saveWord(
-        word: 'reluctant',
-        phonetic: '/ rɪˈlʌktənt /',
+        word: 'perspicacious',
+        phonetic: '/ ˌpɜːrspɪˈkeɪʃəs /',
         partOfSpeech: 'adjective',
-        meaning: 'Not wanting to do something; feeling or showing hesitation.',
-        example: 'She was reluctant to leave the warm fireplace.',
-        syllables: 're*luc*tant',
-        cefr: 'B2',
-        source: 'The Great Gatsby',
-        contextSentence: 'He was reluctant to enter the room, even though he knew it was important.',
+        meaning: 'Having a ready insight into and understanding of things; shrewd and perceptive.',
+        example: 'The perspicacious analyst noticed subtle trends before anyone else.',
+        syllables: 'per*spi*ca*cious',
+        cefr: 'C2',
+        source: 'Advanced Vocabulary',
+        contextSentence: 'Her perspicacious observations during the debate impressed the entire audience.',
         reviewState: 0,
         isFavorite: true,
       );
 
       final w2 = await saveWord(
-        word: 'bohemian',
-        phonetic: '/ boʊˈhiːmiən /',
-        partOfSpeech: 'noun',
-        meaning: 'A person who lives an unconventional, artistic lifestyle.',
-        example: 'They lived a bohemian life in Paris during the 1920s.',
-        syllables: 'bo*he*mi*an',
+        word: 'ubiquitous',
+        phonetic: '/ juːˈbɪkwɪtəs /',
+        partOfSpeech: 'adjective',
+        meaning: 'Present, appearing, or found everywhere.',
+        example: 'Smartphones have become ubiquitous in modern everyday life.',
+        syllables: 'u*biq*ui*tous',
         cefr: 'C1',
-        source: 'The Great Gatsby',
-        contextSentence: 'The party attracted a colorful mix of bohemians and aristocrats.',
+        source: 'Advanced Vocabulary',
+        contextSentence: 'Coffee shops seem ubiquitous in the city center.',
         reviewState: 1,
         isFavorite: false,
       );
@@ -964,15 +957,15 @@ class AppDatabase extends _$AppDatabase {
       );
 
       final w5 = await saveWord(
-        word: 'quintessential',
-        phonetic: '/ ˌkwɪntɪˈsɛnʃəl /',
+        word: 'grandiloquent',
+        phonetic: '/ ɡrænˈdɪləkwənt /',
         partOfSpeech: 'adjective',
-        meaning: 'Representing the most perfect or typical example of a quality or class.',
-        example: 'He was the quintessential tough guy.',
-        syllables: 'quin*tes*sen*tial',
+        meaning: 'Pompous or extravagant in language, style, or manner, especially in a way that is intended to impress.',
+        example: 'A grandiloquent speech filled with archaic rhetoric.',
+        syllables: 'gran*dil*o*quent',
         cefr: 'C2',
-        source: 'Harry Potter',
-        contextSentence: 'It was a quintessential autumn day with crisp crisp air.',
+        source: 'Advanced Vocabulary',
+        contextSentence: 'He spoke in a grandiloquent tone, attempting to sound authoritative.',
         reviewState: 1,
         isFavorite: true,
       );
@@ -992,11 +985,11 @@ class AppDatabase extends _$AppDatabase {
       );
 
       // Link Words to Collections
-      await addWordToCollection(gatsbyColId, w1);
-      await addWordToCollection(gatsbyColId, w2);
+      await addWordToCollection(advancedColId, w1);
+      await addWordToCollection(advancedColId, w2);
       await addWordToCollection(forgetColId, w3);
       await addWordToCollection(ieltsColId, w4);
-      await addWordToCollection(hpColId, w5);
+      await addWordToCollection(advancedColId, w5);
       await addWordToCollection(ieltsColId, w6);
     }
 

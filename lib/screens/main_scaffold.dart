@@ -21,15 +21,15 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final currentIndex = widget.navigationShell.currentIndex;
     final now = DateTime.now();
 
-    if (index == 0) {
-      if (currentIndex != 0) {
-        // Tapping from another tab (e.g. Collections or Settings) goes directly to Home Screen (/home)
+    if (index == 1) {
+      if (currentIndex != 1) {
+        // Tapping Search from Collections (0) or Settings (2) goes directly to Home Screen (/home)
         _lastSearchTap = now;
-        widget.navigationShell.goBranch(0, initialLocation: false);
+        widget.navigationShell.goBranch(1, initialLocation: false);
         return;
       }
 
-      // Already on Home tab (currentIndex == 0)
+      // Already on Home/Search tab (currentIndex == 1)
       final isDoubleTap = _lastSearchTap != null &&
           now.difference(_lastSearchTap!) < const Duration(milliseconds: 400);
 
@@ -50,6 +50,25 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     );
   }
 
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (details.primaryVelocity == null) return;
+    final velocity = details.primaryVelocity!;
+    final currentIndex = widget.navigationShell.currentIndex;
+
+    // Swipe Left (velocity < -300) -> Move to next tab (e.g., Collections 0 -> Home 1 -> Settings 2)
+    if (velocity < -300) {
+      if (currentIndex < 2) {
+        _handleDestinationSelected(currentIndex + 1);
+      }
+    }
+    // Swipe Right (velocity > 300) -> Move to previous tab (e.g., Settings 2 -> Home 1 -> Collections 0)
+    else if (velocity > 300) {
+      if (currentIndex > 0) {
+        _handleDestinationSelected(currentIndex - 1);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -58,10 +77,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final settings = ref.watch(settingsProvider);
 
     return Scaffold(
-      body: BackgroundTextureWidget(
-        texture: settings.bgTexture,
-        opacity: settings.bgTextureOpacity,
-        child: widget.navigationShell,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: _onHorizontalDragEnd,
+        child: BackgroundTextureWidget(
+          texture: settings.bgTexture,
+          opacity: settings.bgTextureOpacity,
+          child: widget.navigationShell,
+        ),
       ),
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
@@ -90,16 +113,16 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           elevation: 0,
           destinations: [
             NavigationDestination(
-              icon: Icon(CupertinoIcons.search,
-                  color: isDark ? Colors.white54 : Colors.grey.shade600),
-              selectedIcon: Icon(CupertinoIcons.search, color: primaryColor),
-              label: 'Search',
-            ),
-            NavigationDestination(
               icon: Icon(CupertinoIcons.book,
                   color: isDark ? Colors.white54 : Colors.grey.shade600),
               selectedIcon: Icon(CupertinoIcons.book_fill, color: primaryColor),
               label: 'Collections',
+            ),
+            NavigationDestination(
+              icon: Icon(CupertinoIcons.search,
+                  color: isDark ? Colors.white54 : Colors.grey.shade600),
+              selectedIcon: Icon(CupertinoIcons.search, color: primaryColor),
+              label: 'Search',
             ),
             NavigationDestination(
               icon: Icon(CupertinoIcons.settings,

@@ -65,30 +65,13 @@ class SettingsScreen extends ConsumerWidget {
                     _buildStatsHeroCard(context, ref, primaryColor, isDark, settings.dailyGoal),
                     const SizedBox(height: 24),
 
-                    // SECTION 1: AI & PERSONALIZATION
-                    _buildSectionHeader(context, 'AI & PERSONALIZATION', isDark),
+                    // SECTION 1: PERSONALIZATION
+                    _buildSectionHeader(context, 'PERSONALIZATION', isDark),
                     const SizedBox(height: 8),
                     _buildGroupedCardContainer(
                       context: context,
                       isDark: isDark,
                       items: [
-                        _buildSectionItem(
-                          context,
-                          icon: CupertinoIcons.sparkles,
-                          title: 'Gemini AI Engine',
-                          subtitle: 'Smart meanings, etymology & assistant',
-                          badgeText: aiStatus,
-                          trailing: Switch.adaptive(
-                            value: settings.geminiAiEnabled,
-                            activeColor: primaryColor,
-                            onChanged: (val) {
-                              settingsNotifier.setGeminiAiEnabled(val);
-                            },
-                          ),
-                          onTap: () => context.push('/settings/gemini'),
-                          isDark: isDark,
-                          primaryColor: primaryColor,
-                        ),
                         _buildSectionItem(
                           context,
                           icon: CupertinoIcons.paintbrush,
@@ -128,6 +111,23 @@ class SettingsScreen extends ConsumerWidget {
                           subtitle: 'Daily target, notifications & streak protection',
                           badgeText: '${settings.dailyGoal} words/day',
                           onTap: () => context.push('/settings/goals'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.sparkles,
+                          title: 'Gemini AI Engine',
+                          subtitle: 'Smart meanings, etymology & assistant',
+                          badgeText: aiStatus,
+                          trailing: Switch.adaptive(
+                            value: settings.geminiAiEnabled,
+                            activeColor: primaryColor,
+                            onChanged: (val) {
+                              settingsNotifier.setGeminiAiEnabled(val);
+                            },
+                          ),
+                          onTap: () => context.push('/settings/gemini'),
                           isDark: isDark,
                           primaryColor: primaryColor,
                         ),
