@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
-import '../core/providers/settings_provider.dart';
 import '../theme/background_patterns.dart';
-import '../theme/app_colors.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -24,10 +22,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final now = DateTime.now();
 
     if (index == 0) {
-      // Handle tap / double-tap on Search icon in Bottom Nav Bar
-      final isDoubleTap = _lastSearchTap != null &&
-          now.difference(_lastSearchTap!) < const Duration(milliseconds: 600);
-
       _lastSearchTap = now;
 
       // Navigate to /home/search route directly
@@ -54,6 +48,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     return Scaffold(
       body: BackgroundTextureWidget(
         texture: settings.bgTexture,
+        opacity: settings.bgTextureOpacity,
         child: widget.navigationShell,
       ),
       bottomNavigationBar: NavigationBarTheme(

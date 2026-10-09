@@ -2,27 +2,38 @@ import 'package:flutter/material.dart';
 
 class BackgroundTextureWidget extends StatelessWidget {
   final String texture; // 'none', 'dots', 'grid', 'crosshatch'
+  final double opacity; // 0.1 to 1.0
   final Widget child;
 
   const BackgroundTextureWidget({
     super.key,
     required this.texture,
+    this.opacity = 0.8,
     required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (texture == 'none' || texture.isEmpty) {
+    if (texture == 'none' || texture.isEmpty || opacity <= 0.0) {
       return child;
     }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final bgColor = theme.scaffoldBackgroundColor;
+    final rawBgColor = theme.scaffoldBackgroundColor;
+    final bgColor = (rawBgColor == Colors.transparent || rawBgColor.alpha == 0)
+        ? theme.colorScheme.background
+        : rawBgColor;
+
+    // Direct dynamic mapping from opacity slider (0.1..1.0) to clear, dramatic alpha
+    final minAlpha = isDark ? 0.03 : 0.02;
+    final maxAlpha = isDark ? 0.32 : 0.28;
+    final effectiveOpacity = (minAlpha + (maxAlpha - minAlpha) * opacity.clamp(0.0, 1.0)).clamp(0.005, 1.0);
+
     final patternColor = isDark
-        ? Colors.white.withOpacity(0.08)
-        : Colors.black.withOpacity(0.06);
+        ? Colors.white.withOpacity(effectiveOpacity)
+        : Colors.black.withOpacity(effectiveOpacity);
 
     return Stack(
       children: [

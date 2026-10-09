@@ -1,12 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../core/utils/pos_helper.dart';
@@ -305,9 +310,52 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     }
   }
 
+  String _formatShareCaption(LexicalEntry entry) {
+    final phonetic = entry.core.phonetic.isNotEmpty ? ' (${entry.core.phonetic})' : '';
+    final pos = entry.core.partOfSpeech.isNotEmpty ? '\n${entry.core.partOfSpeech}' : '';
+    return '${entry.core.headword.toUpperCase()}$phonetic$pos\n\nMeaning: ${entry.dictionaryLayer.simpleMeaning}';
+  }
+
+  Future<void> _shareCardImage(
+    BuildContext context,
+    GlobalKey cardBoundaryKey,
+    LexicalEntry entry,
+  ) async {
+    final shareCaption = _formatShareCaption(entry);
+
+    try {
+      final boundary = cardBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+        return;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      final pngBytes = byteData.buffer.asUint8List();
+
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/${entry.core.headword.toLowerCase()}_card.png';
+      final file = File(filePath);
+      await file.writeAsBytes(pngBytes);
+
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: shareCaption,
+        subject: 'Word Card: ${entry.core.headword}',
+      );
+    } catch (e) {
+      debugPrint('Error sharing card image: $e');
+      await Share.share(shareCaption, subject: 'Word Card: ${entry.core.headword}');
+    }
+  }
+
   void _showShareSheet(BuildContext context) {
     final entry = _activeEntry;
     if (entry == null) return;
+    final cardBoundaryKey = GlobalKey();
 
     showModalBottomSheet(
       context: context,
@@ -315,6 +363,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       builder: (ctx) {
         final theme = Theme.of(context);
         final isDark = theme.brightness == Brightness.dark;
+
+        final settings = ref.watch(settingsProvider);
+        final accent = AppAccent.fromColor(settings.accentColor);
+        final cardBgColor = accent.adaptiveSoft(context);
+        final textColor = isDark ? AppColors.textPrimaryDark : AppColors.textPrimary;
+        final subTextColor = isDark ? accent.darkSoftText : AppColors.textPrimary;
+        final brandColor = isDark ? accent.darkSoftText : accent.primary;
 
         return Container(
           padding: const EdgeInsets.all(24),
@@ -340,84 +395,118 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Styled Card Preview
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          entry.core.headword.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+              // Styled Card Preview wrapped in RepaintBoundary for high-res PNG image capture
+              RepaintBoundary(
+                key: cardBoundaryKey,
+                child: Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: cardBgColor,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDark ? accent.primary.withOpacity(0.3) : accent.primary.withOpacity(0.2),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark ? Colors.black.withOpacity(0.25) : accent.primary.withOpacity(0.15),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            entry.core.headword.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                              letterSpacing: -0.5,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'Dictionary',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.darkSoftYellowText : AppColors.primaryPurple,
+                          Text(
+                            'Dictionary',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: brandColor,
+                              fontSize: 14,
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${entry.core.phonetic} • ${formatPartOfSpeech(entry.core.partOfSpeech)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: subTextColor,
                         ),
-                      ],
-                    ),
-                    Text(
-                      '${entry.core.phonetic} • ${formatPartOfSpeech(entry.core.partOfSpeech)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkSoftYellowText.withOpacity(0.8) : AppColors.textSecondary,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '"${entry.dictionaryLayer.simpleMeaning}"',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        height: 1.4,
-                        color: isDark ? AppColors.darkSoftYellowText : AppColors.textPrimary,
+                      const SizedBox(height: 14),
+                      Text(
+                        '"${entry.dictionaryLayer.simpleMeaning}"',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
+                          color: textColor,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(
-                      text: '${entry.core.headword.toUpperCase()} (${entry.core.phonetic})\n'
-                          '${entry.core.partOfSpeech}\n\n'
-                          'Meaning: ${entry.dictionaryLayer.simpleMeaning}\n\n'
-                          'Learned with Dictionary ✨',
-                    ));
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Word card summary copied to clipboard!'),
-                        behavior: SnackBarBehavior.floating,
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        side: BorderSide(color: theme.primaryColor, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                    );
-                  },
-                  icon: const Icon(CupertinoIcons.doc_on_doc),
-                  label: const Text('Copy Word Summary'),
-                ),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: _formatShareCaption(entry)));
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Word card summary copied to clipboard!'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      icon: Icon(CupertinoIcons.doc_on_doc, color: theme.primaryColor, size: 18),
+                      label: Text('Copy', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _shareCardImage(context, cardBoundaryKey, entry);
+                      },
+                      icon: const Icon(CupertinoIcons.share, size: 18),
+                      label: const Text('Share Card', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -426,13 +515,35 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  void _showCreateNewCollectionDialog(BuildContext context, AppDatabase db, SavedWord savedWord) {
+  void _showCreateNewCollectionDialog(BuildContext context, WidgetRef ref, AppDatabase db, SavedWord savedWord) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = theme.primaryColor;
 
     final titleController = TextEditingController();
     final descController = TextEditingController();
+    final tagsController = TextEditingController();
+
+    String selectedColor = '0xFFFFF0B3'; // Default soft yellow
+    String selectedIcon = 'book';
+
+    final iconOptions = [
+      {'name': 'book', 'icon': CupertinoIcons.book_fill},
+      {'name': 'bookmark', 'icon': CupertinoIcons.bookmark_fill},
+      {'name': 'star', 'icon': CupertinoIcons.star_fill},
+      {'name': 'flame', 'icon': CupertinoIcons.flame_fill},
+      {'name': 'lightbulb', 'icon': CupertinoIcons.lightbulb_fill},
+      {'name': 'heart', 'icon': CupertinoIcons.heart_fill},
+      {'name': 'folder', 'icon': CupertinoIcons.folder_fill},
+    ];
+
+    final colorOptions = [
+      '0xFFFFF0B3', // Soft Yellow
+      '0xFFD1FAE5', // Soft Green
+      '0xFFFFEDD5', // Soft Orange
+      '0xFFD6E6FF', // Soft Blue
+      '0xFFFFF0F5', // Soft Cream/Pink
+      '0xFFFFE4E6', // Soft Coral
+    ];
 
     showModalBottomSheet(
       context: context,
@@ -443,123 +554,275 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 24,
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            final keyboardHeight = MediaQuery.of(ctx).viewInsets.bottom;
+            final previewColor = Color(int.parse(selectedColor));
+            final previewIconData = iconOptions.firstWhere(
+              (opt) => opt['name'] == selectedIcon,
+              orElse: () => iconOptions.first,
+            )['icon'] as IconData;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: keyboardHeight + 20,
+              ),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(CupertinoIcons.folder_badge_plus, color: primaryColor, size: 20),
+                    // Handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white24 : Colors.black12,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const SizedBox(width: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Header Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text(
                           'Create New Collection',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
+                        ),
+                        IconButton(
+                          icon: Icon(CupertinoIcons.xmark_circle_fill, color: isDark ? Colors.white54 : AppColors.textDisabled),
+                          onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(CupertinoIcons.xmark),
-                      onPressed: () => Navigator.pop(ctx),
+                    const SizedBox(height: 16),
+
+                    // Live Card Preview
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : theme.cardTheme.color,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: previewColor,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Icon(previewIconData, color: AppColors.textPrimary, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  titleController.text.trim().isNotEmpty
+                                      ? titleController.text.trim()
+                                      : 'Collection Title',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  descController.text.trim().isNotEmpty
+                                      ? descController.text.trim()
+                                      : 'Description preview',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Collection Name Field
+                    TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Collection Name',
+                        hintText: 'e.g. Science Terminology',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Description Field
+                    TextField(
+                      controller: descController,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Description (optional)',
+                        hintText: 'e.g. Terms from biology chapter 4',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tags Field
+                    TextField(
+                      controller: tagsController,
+                      onChanged: (_) => setBottomSheetState(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Tags (comma separated)',
+                        hintText: 'e.g. Exam, IELTS, Classic',
+                        prefixIcon: const Icon(CupertinoIcons.tag_fill, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Icon Selector
+                    Text('Choose Icon:', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: iconOptions.map((opt) {
+                          final name = opt['name'] as String;
+                          final icon = opt['icon'] as IconData;
+                          final isSelected = selectedIcon == name;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: InkWell(
+                              onTap: () {
+                                setBottomSheetState(() {
+                                  selectedIcon = name;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: 44,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? theme.primaryColor : theme.cardTheme.color,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isSelected ? theme.primaryColor : AppColors.cardBorder(context),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Icon(
+                                  icon,
+                                  size: 20,
+                                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Color Selector
+                    Text('Accent Color:', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: colorOptions.map((cHex) {
+                        final isSelected = selectedColor == cHex;
+                        final color = Color(int.parse(cHex));
+                        return GestureDetector(
+                          onTap: () {
+                            setBottomSheetState(() {
+                              selectedColor = cHex;
+                            });
+                          },
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(color: AppColors.textPrimary, width: 3)
+                                  : Border.all(color: AppColors.border, width: 1),
+                            ),
+                            child: isSelected
+                                ? const Icon(CupertinoIcons.check_mark, size: 16, color: AppColors.textPrimary)
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Action Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          final title = titleController.text.trim();
+                          if (title.isNotEmpty) {
+                            Navigator.pop(ctx);
+                            final tags = tagsController.text.trim();
+
+                            final newColId = await db.createCollection(
+                              title: title,
+                              description: descController.text.trim().isNotEmpty ? descController.text.trim() : null,
+                              colorHex: selectedColor,
+                              iconName: selectedIcon,
+                              tags: tags.isNotEmpty ? tags : null,
+                            );
+
+                            await db.addWordToCollection(newColId, savedWord.id);
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Created "$title" & added "${savedWord.word}"!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text(
+                          'Create & Add',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Collection Title',
-                    labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w700),
-                    hintText: 'e.g., Academic Words, GRE Prep',
-                    fillColor: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
-                    filled: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descController,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Description (Optional)',
-                    labelStyle: TextStyle(color: primaryColor.withOpacity(0.8), fontWeight: FontWeight.w700),
-                    hintText: 'e.g., Key vocabulary for my exam',
-                    fillColor: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
-                    filled: true,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      elevation: 2,
-                    ),
-                    onPressed: () async {
-                      final title = titleController.text.trim();
-                      if (title.isNotEmpty) {
-                        Navigator.pop(ctx);
-                        final colId = await db.createCollection(
-                          title: title,
-                          description: descController.text.trim().isNotEmpty ? descController.text.trim() : null,
-                          colorHex: '0xFF8B5CF6',
-                        );
-                        await db.addWordToCollection(colId, savedWord.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Created "$title" & added "${savedWord.word}"!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    icon: const Icon(CupertinoIcons.checkmark_seal_fill, size: 18),
-                    label: const Text(
-                      'Create & Add',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -619,8 +882,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       TextButton.icon(
                         style: TextButton.styleFrom(padding: EdgeInsets.zero),
                         onPressed: () {
-                          Navigator.pop(ctx);
-                          _showCreateNewCollectionDialog(context, db, savedWord);
+                          _showCreateNewCollectionDialog(context, ref, db, savedWord);
                         },
                         icon: const Icon(CupertinoIcons.add, size: 14),
                         label: const Text('New Collection', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
@@ -645,8 +907,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 ),
                                 onPressed: () {
-                                  Navigator.pop(ctx);
-                                  _showCreateNewCollectionDialog(context, db, savedWord);
+                                  _showCreateNewCollectionDialog(context, ref, db, savedWord);
                                 },
                                 icon: const Icon(CupertinoIcons.add, size: 16),
                                 label: const Text('Create First Collection'),
@@ -754,6 +1015,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: BackgroundTextureWidget(
         texture: settings.bgTexture,
+        opacity: settings.bgTextureOpacity,
         child: SafeArea(
           child: Column(
             children: [

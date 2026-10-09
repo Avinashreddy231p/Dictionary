@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/database/database.dart';
 
 class ExportService {
@@ -46,6 +48,39 @@ class ExportService {
     }
 
     return sb.toString();
+  }
+
+  /// Creates a temporary file in local storage and returns its File path.
+  static Future<File> createExportFile(String filename, String content) async {
+    final tempDir = await getTemporaryDirectory();
+    final cleanName = filename.replaceAll(RegExp(r'[^\w.-]'), '_');
+    final file = File('${tempDir.path}/$cleanName');
+    return await file.writeAsString(content);
+  }
+
+  /// Exports data as a file, copies content, and notifies the user.
+  static Future<void> exportAndShareFile({
+    required BuildContext context,
+    required String filename,
+    required String content,
+    required String successMessage,
+  }) async {
+    try {
+      final file = await createExportFile(filename, content);
+      await Clipboard.setData(ClipboardData(text: content));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$successMessage (Saved as ${file.path.split('/').last})'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (_) {
+      await copyToClipboard(context, content, successMessage);
+    }
   }
 
   static Future<void> copyToClipboard(BuildContext context, String content, String message) async {

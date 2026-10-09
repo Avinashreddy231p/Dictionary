@@ -722,67 +722,125 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                 isDark: isDark,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: _buildTextureOption(
-                          context,
-                          label: 'Plain Solid',
-                          icon: CupertinoIcons.square,
-                          isSelected: settings.bgTexture == 'none',
-                          onTap: () {
-                            settingsNotifier.setBgTexture('none');
-                            _showFeedback(context, 'Set background to Plain Solid');
-                          },
-                          primaryColor: primaryColor,
-                          isDark: isDark,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextureOption(
+                              context,
+                              label: 'Plain Solid',
+                              icon: CupertinoIcons.square,
+                              isSelected: settings.bgTexture == 'none',
+                              onTap: () {
+                                settingsNotifier.setBgTexture('none');
+                                _showFeedback(context, 'Set background to Plain Solid');
+                              },
+                              primaryColor: primaryColor,
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildTextureOption(
+                              context,
+                              label: 'Dot Grid',
+                              icon: CupertinoIcons.circle_grid_3x3_fill,
+                              isSelected: settings.bgTexture == 'dots',
+                              onTap: () {
+                                settingsNotifier.setBgTexture('dots');
+                                _showFeedback(context, 'Set background to Dot Grid');
+                              },
+                              primaryColor: primaryColor,
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildTextureOption(
+                              context,
+                              label: 'Line Grid',
+                              icon: CupertinoIcons.grid,
+                              isSelected: settings.bgTexture == 'grid',
+                              onTap: () {
+                                settingsNotifier.setBgTexture('grid');
+                                _showFeedback(context, 'Set background to Line Grid');
+                              },
+                              primaryColor: primaryColor,
+                              isDark: isDark,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildTextureOption(
+                              context,
+                              label: 'Crosshatch',
+                              icon: CupertinoIcons.line_horizontal_3_decrease,
+                              isSelected: settings.bgTexture == 'crosshatch',
+                              onTap: () {
+                                settingsNotifier.setBgTexture('crosshatch');
+                                _showFeedback(context, 'Set background to Crosshatch');
+                              },
+                              primaryColor: primaryColor,
+                              isDark: isDark,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: _buildTextureOption(
-                          context,
-                          label: 'Dot Grid',
-                          icon: CupertinoIcons.circle_grid_3x3_fill,
-                          isSelected: settings.bgTexture == 'dots',
-                          onTap: () {
-                            settingsNotifier.setBgTexture('dots');
-                            _showFeedback(context, 'Set background to Dot Grid');
-                          },
-                          primaryColor: primaryColor,
-                          isDark: isDark,
+                      if (settings.bgTexture != 'none') ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Divider(height: 1),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: _buildTextureOption(
-                          context,
-                          label: 'Line Grid',
-                          icon: CupertinoIcons.grid,
-                          isSelected: settings.bgTexture == 'grid',
-                          onTap: () {
-                            settingsNotifier.setBgTexture('grid');
-                            _showFeedback(context, 'Set background to Line Grid');
-                          },
-                          primaryColor: primaryColor,
-                          isDark: isDark,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Pattern Opacity',
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Adjust visibility intensity of the background pattern',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${(settings.bgTextureOpacity * 100).round()}%',
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: _buildTextureOption(
-                          context,
-                          label: 'Crosshatch',
-                          icon: CupertinoIcons.line_horizontal_3_decrease,
-                          isSelected: settings.bgTexture == 'crosshatch',
-                          onTap: () {
-                            settingsNotifier.setBgTexture('crosshatch');
-                            _showFeedback(context, 'Set background to Crosshatch');
+                        const SizedBox(height: 12),
+                        Slider.adaptive(
+                          value: settings.bgTextureOpacity,
+                          min: 0.1,
+                          max: 1.0,
+                          divisions: 9,
+                          activeColor: primaryColor,
+                          onChanged: (val) {
+                            settingsNotifier.setBgTextureOpacity(val);
                           },
-                          primaryColor: primaryColor,
-                          isDark: isDark,
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),

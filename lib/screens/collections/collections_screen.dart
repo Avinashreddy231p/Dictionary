@@ -484,27 +484,91 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
   }
 
   void _confirmDeleteCollection(BuildContext context, Collection collection) {
-    showDialog(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text('Delete Collection?'),
-        content: Text('Are you sure you want to delete "${collection.title}"? The words will remain in your general vocabulary.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(databaseProvider).deleteCollection(collection.id);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(CupertinoIcons.trash_fill, color: Colors.redAccent, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Delete Collection?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Are you sure you want to delete "${collection.title}"? The words will remain saved in your general vocabulary.',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                  color: isDark ? Colors.white70 : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await ref.read(databaseProvider).deleteCollection(collection.id);
+                      },
+                      icon: const Icon(CupertinoIcons.trash, size: 16),
+                      label: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -551,9 +615,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(context),
-                    const SizedBox(height: 24),
-                    _buildSmartCollectionsHeader(context),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     _buildSmartCollectionsRow(
                       context,
                       filter: _selectedFilter,
@@ -680,47 +742,30 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'My Collections',
-                  maxLines: 1,
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    height: 1.1,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Your saved vocabulary organized.',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                ),
-              ),
-            ],
+        Text(
+          'My Collections',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+            letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: theme.primaryColor.withOpacity(0.12),
-            shape: BoxShape.circle,
+        const SizedBox(height: 3),
+        Text(
+          'Your saved vocabulary organized.',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            fontSize: 13,
           ),
-          child: Icon(CupertinoIcons.sparkles, color: theme.primaryColor, size: 24),
         ),
       ],
     );

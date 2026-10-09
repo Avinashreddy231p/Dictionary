@@ -36,6 +36,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keyThemeVariant = 'settings_theme_variant';
   static const _keyShowBgBlobs = 'settings_show_bg_blobs';
   static const _keyBgTexture = 'settings_bg_texture';
+  static const _keyBgTextureOpacity = 'settings_bg_texture_opacity';
   static const _keyAppFontFamily = 'settings_app_font_family';
   static const _keyCardRadiusStyle = 'settings_card_radius_style';
   static const _keyBorderWidthStyle = 'settings_border_width_style';
@@ -76,6 +77,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final themeVariant = _prefs.getString(_keyThemeVariant) ?? 'standard';
     final showBgBlobs = _prefs.getBool(_keyShowBgBlobs) ?? true;
     final bgTexture = _prefs.getString(_keyBgTexture) ?? 'dots';
+    final bgTextureOpacity = _prefs.getDouble(_keyBgTextureOpacity) ?? 0.8;
     final appFontFamily = _prefs.getString(_keyAppFontFamily) ?? 'Nunito';
     final cardRadiusStyle = _prefs.getString(_keyCardRadiusStyle) ?? 'rounded';
     final borderWidthStyle = _prefs.getString(_keyBorderWidthStyle) ?? 'standard';
@@ -104,6 +106,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       themeVariant: themeVariant,
       showBgBlobs: showBgBlobs,
       bgTexture: bgTexture,
+      bgTextureOpacity: bgTextureOpacity,
       appFontFamily: appFontFamily,
       cardRadiusStyle: cardRadiusStyle,
       borderWidthStyle: borderWidthStyle,
@@ -215,6 +218,11 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setBgTexture(String texture) async {
     state = state.copyWith(bgTexture: texture);
     await _prefs.setString(_keyBgTexture, texture);
+  }
+
+  Future<void> setBgTextureOpacity(double opacity) async {
+    state = state.copyWith(bgTextureOpacity: opacity);
+    await _prefs.setDouble(_keyBgTextureOpacity, opacity);
   }
 
   Future<void> setAppFontFamily(String fontFamily) async {

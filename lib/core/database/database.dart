@@ -260,8 +260,14 @@ class AppDatabase extends _$AppDatabase {
     String? iconName,
     String? tags,
   }) async {
+    final cleanTitle = title.trim();
+    final existing = await (select(collections)..where((t) => t.title.lower().equals(cleanTitle.toLowerCase()))).get();
+    if (existing.isNotEmpty) {
+      return existing.first.id;
+    }
+
     return into(collections).insert(CollectionsCompanion.insert(
-      title: title,
+      title: cleanTitle,
       description: Value(description),
       colorHex: Value(colorHex ?? '0xFFE5D4FF'),
       iconName: Value(iconName ?? 'book'),

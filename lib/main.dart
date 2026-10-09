@@ -59,6 +59,7 @@ class DictionaryApp extends ConsumerWidget {
           ),
           child: BackgroundTextureWidget(
             texture: settings.bgTexture,
+            opacity: settings.bgTextureOpacity,
             child: child!,
           ),
         );

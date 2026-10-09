@@ -38,6 +38,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = theme.primaryColor;
@@ -54,126 +55,137 @@ class SettingsScreen extends ConsumerWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildHeader(context, primaryColor, isDark),
                     const SizedBox(height: 20),
-                    _buildStatsCard(context, ref, primaryColor, isDark, settings.dailyGoal),
-                    const SizedBox(height: 28),
-                    Text(
-                      'Personalization & Intelligence',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: primaryColor,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.sparkles,
-                      iconBgColor: primaryColor.withOpacity(0.15),
-                      iconColor: primaryColor,
-                      title: 'AI Assistant & Gemini Engine',
-                      subtitle: 'API key, AI models, language & features',
-                      badgeText: aiStatus,
-                      route: '/settings/gemini',
+                    _buildStatsHeroCard(context, ref, primaryColor, isDark, settings.dailyGoal),
+                    const SizedBox(height: 24),
+
+                    // SECTION 1: AI & PERSONALIZATION
+                    _buildSectionHeader(context, 'AI & PERSONALIZATION', isDark),
+                    const SizedBox(height: 8),
+                    _buildGroupedCardContainer(
+                      context: context,
                       isDark: isDark,
-                      primaryColor: primaryColor,
+                      items: [
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.sparkles,
+                          title: 'Gemini AI Engine',
+                          subtitle: 'Smart meanings, etymology & assistant',
+                          badgeText: aiStatus,
+                          trailing: Switch.adaptive(
+                            value: settings.geminiAiEnabled,
+                            activeColor: primaryColor,
+                            onChanged: (val) {
+                              settingsNotifier.setGeminiAiEnabled(val);
+                            },
+                          ),
+                          onTap: () => context.push('/settings/gemini'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.paintbrush,
+                          title: 'Appearance & Theme',
+                          subtitle: '7 theme variants, accent colors & typography',
+                          badgeText: activeAccentName,
+                          onTap: () => context.push('/settings/appearance'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.speaker_2,
+                          title: 'Audio & Pronunciation',
+                          subtitle: 'US/UK pronunciation & playback speed',
+                          badgeText: '${settings.preferredAccent} • ${settings.audioSpeed}x',
+                          onTap: () => context.push('/settings/audio'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.paintbrush_fill,
-                      iconBgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow,
-                      iconColor: isDark ? AppColors.darkSoftYellowText : Colors.orange.shade800,
-                      title: 'Appearance & Theme',
-                      subtitle: 'Pantone accents, fonts, shapes & textures',
-                      badgeText: activeAccentName,
-                      route: '/settings/appearance',
+
+                    const SizedBox(height: 24),
+
+                    // SECTION 2: GOALS & SYSTEM
+                    _buildSectionHeader(context, 'GOALS & SYSTEM', isDark),
+                    const SizedBox(height: 8),
+                    _buildGroupedCardContainer(
+                      context: context,
                       isDark: isDark,
-                      primaryColor: primaryColor,
+                      items: [
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.flame,
+                          title: 'Learning & Goals',
+                          subtitle: 'Daily target, notifications & streak protection',
+                          badgeText: '${settings.dailyGoal} words/day',
+                          onTap: () => context.push('/settings/goals'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.tray_full,
+                          title: 'Storage & Offline DB',
+                          subtitle: 'Offline dictionary, cache & JSON backup',
+                          badgeText: settings.offlineDatabaseEnabled ? '12.4 MB Offline' : 'Online Only',
+                          trailing: Switch.adaptive(
+                            value: settings.offlineDatabaseEnabled,
+                            activeColor: primaryColor,
+                            onChanged: (val) {
+                              settingsNotifier.setOfflineDatabaseEnabled(val);
+                            },
+                          ),
+                          onTap: () => context.push('/settings/storage'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.arrow_2_squarepath,
+                          title: 'n8n Workflow Automation',
+                          subtitle: 'Environment: ${N8nConfig.environment}',
+                          badgeText: N8nConfig.environment.toUpperCase(),
+                          onTap: () => context.push('/settings/storage'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.speaker_2_fill,
-                      iconBgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
-                      iconColor: primaryColor,
-                      title: 'Audio & Pronunciation',
-                      subtitle: 'US/UK accent, audio speed & preview tests',
-                      badgeText: '${settings.preferredAccent} • ${settings.audioSpeed}x',
-                      route: '/settings/audio',
+
+                    const SizedBox(height: 24),
+
+                    // SECTION 3: INFORMATION & ABOUT
+                    _buildSectionHeader(context, 'INFORMATION & ABOUT', isDark),
+                    const SizedBox(height: 8),
+                    _buildGroupedCardContainer(
+                      context: context,
                       isDark: isDark,
-                      primaryColor: primaryColor,
+                      items: [
+                        _buildSectionItem(
+                          context,
+                          icon: CupertinoIcons.info_circle,
+                          title: 'About, Terms & Privacy',
+                          subtitle: 'Version info, open source licenses & reset',
+                          badgeText: 'v1.0.0',
+                          onTap: () => context.push('/settings/about'),
+                          isDark: isDark,
+                          primaryColor: primaryColor,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 28),
-                    Text(
-                      'System & Data Management',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: primaryColor,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.flame_fill,
-                      iconBgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen,
-                      iconColor: Colors.green,
-                      title: 'Learning & Goals',
-                      subtitle: 'Daily targets, reminders & streak protection',
-                      badgeText: '${settings.dailyGoal} words/day',
-                      route: '/settings/goals',
-                      isDark: isDark,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.arrow_2_squarepath,
-                      iconBgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue,
-                      iconColor: primaryColor,
-                      title: 'n8n Workflow Automation',
-                      subtitle: 'Environment: ${N8nConfig.environment}',
-                      badgeText: N8nConfig.environment.toUpperCase(),
-                      route: '/settings/storage',
-                      isDark: isDark,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.tray_full_fill,
-                      iconBgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple,
-                      iconColor: primaryColor,
-                      title: 'Storage & Data Management',
-                      subtitle: 'Offline database, cache & backup JSON',
-                      badgeText: settings.offlineDatabaseEnabled ? '12.4 MB Offline' : 'Online Only',
-                      route: '/settings/storage',
-                      isDark: isDark,
-                      primaryColor: primaryColor,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildNavigationCard(
-                      context,
-                      icon: CupertinoIcons.info_circle_fill,
-                      title: 'About & Support',
-                      subtitle: 'App version, privacy policy & reset defaults',
-                      badgeText: 'v1.0.0',
-                      route: '/settings/about',
-                      isDark: isDark,
-                      primaryColor: primaryColor,
-                    ),
+
                     const SizedBox(height: 36),
-                    _buildFooter(context, primaryColor),
-                    const SizedBox(height: 40),
+                    _buildFooter(context, primaryColor, isDark),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -184,52 +196,52 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Color primaryColor, bool isDark) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Settings',
-                style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                      height: 1.1,
-                    ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Customize your Dictionary experience',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
-                    ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+  Widget _buildSectionHeader(BuildContext context, String title, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+          letterSpacing: 0.8,
         ),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: primaryColor.withOpacity(0.15),
-            shape: BoxShape.circle,
-            border: Border.all(color: primaryColor.withOpacity(0.3), width: 1.5),
-          ),
-          child: Icon(
-            CupertinoIcons.gear_alt_fill,
-            color: primaryColor,
-            size: 26,
-          ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, Color primaryColor, bool isDark) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Settings',
+          style: theme.textTheme.headlineLarge?.copyWith(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+                letterSpacing: -0.4,
+              ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'Customize your Dictionary preferences',
+          style: theme.textTheme.bodyMedium?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                fontSize: 13,
+              ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
   }
 
-  Widget _buildStatsCard(
+  Widget _buildStatsHeroCard(
     BuildContext context,
     WidgetRef ref,
     Color primaryColor,
@@ -259,31 +271,27 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     final masteryRate = savedWordsCount == 0
-        ? '0% Rate'
-        : '${((masteredCount / savedWordsCount) * 100).round()}% Accuracy';
+        ? '0%'
+        : '${((masteredCount / savedWordsCount) * 100).round()}%';
 
     final savedWordsList = savedWordsAsync.asData?.value ?? [];
     final streakDays = _calculateStreak(savedWordsList);
+    final goalProgressRatio = dailyGoal > 0 ? (todaySavedCount / dailyGoal).clamp(0.0, 1.0) : 0.0;
+
+    final tileBg = isDark ? AppColors.darkTileBg : const Color(0xFFF7F7F9);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => context.push('/stats'),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
+          color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
           borderRadius: BorderRadius.circular(AppTheme.cardRadius(context)),
           border: Border.all(
             color: isDark ? AppColors.darkBorder : AppColors.border,
             width: AppTheme.borderWidth(context),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,56 +301,76 @@ class SettingsScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.darkSoftYellow
-                        : AppColors.softYellow,
+                    color: isDark ? Colors.white10 : primaryColor.withOpacity(0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    CupertinoIcons.chart_bar_square_fill,
-                    color: isDark
-                        ? AppColors.darkSoftYellowText
-                        : Colors.orange.shade800,
-                    size: 20,
+                    CupertinoIcons.chart_bar_square,
+                    color: primaryColor,
+                    size: 18,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    'Learning Stats',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Learning Overview',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Today\'s Goal: $todaySavedCount / $dailyGoal words',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? Colors.white10 : primaryColor.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Full Analytics',
+                        'Analytics',
                         style: TextStyle(
                           color: primaryColor,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           fontSize: 11,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Icon(CupertinoIcons.chevron_right, size: 12, color: primaryColor),
+                      const SizedBox(width: 2),
+                      Icon(CupertinoIcons.chevron_right, size: 11, color: primaryColor),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
+
+            // Progress Bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: goalProgressRatio,
+                minHeight: 6,
+                backgroundColor: isDark ? Colors.white12 : AppColors.border.withOpacity(0.6),
+                valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
             Row(
               children: [
                 Expanded(
@@ -350,49 +378,33 @@ class SettingsScreen extends ConsumerWidget {
                     context,
                     title: 'Streak',
                     value: '$streakDays Days 🔥',
-                    icon: CupertinoIcons.flame_fill,
-                    iconColor: Colors.orange,
-                    bgColor: isDark ? AppColors.darkSoftYellow : AppColors.softYellow.withOpacity(0.5),
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatTile(
-                    context,
-                    title: 'Words Saved',
-                    value: '$savedWordsCount Words',
-                    icon: CupertinoIcons.book_fill,
+                    icon: CupertinoIcons.flame,
                     iconColor: primaryColor,
-                    bgColor: isDark ? AppColors.darkSoftPurple : AppColors.softPurple.withOpacity(0.5),
+                    bgColor: tileBg,
                     isDark: isDark,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildStatTile(
                     context,
-                    title: 'Today\'s Progress',
-                    value: '$todaySavedCount / $dailyGoal Words',
-                    icon: CupertinoIcons.checkmark_seal_fill,
-                    iconColor: Colors.green,
-                    bgColor: isDark ? AppColors.darkSoftGreen : AppColors.softGreen.withOpacity(0.5),
+                    title: 'Saved',
+                    value: '$savedWordsCount Words',
+                    icon: CupertinoIcons.book,
+                    iconColor: primaryColor,
+                    bgColor: tileBg,
                     isDark: isDark,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: _buildStatTile(
                     context,
-                    title: 'Mastery Rate',
+                    title: 'Accuracy',
                     value: masteryRate,
-                    icon: CupertinoIcons.star_fill,
-                    iconColor: Colors.amber,
-                    bgColor: isDark ? AppColors.darkSoftBlue : AppColors.softBlue.withOpacity(0.5),
+                    icon: CupertinoIcons.star,
+                    iconColor: primaryColor,
+                    bgColor: tileBg,
                     isDark: isDark,
                   ),
                 ),
@@ -414,12 +426,12 @@ class SettingsScreen extends ConsumerWidget {
     required bool isDark,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? iconColor.withOpacity(0.3) : Colors.transparent,
+          color: isDark ? AppColors.darkBorder : AppColors.border.withOpacity(0.5),
           width: 1,
         ),
       ),
@@ -428,15 +440,15 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: iconColor, size: 16),
-              const SizedBox(width: 6),
+              Icon(icon, color: iconColor, size: 13),
+              const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        color: isDark ? Colors.white70 : AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 10,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                       ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -444,15 +456,15 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               value,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
                   ),
             ),
           ),
@@ -461,56 +473,73 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNavigationCard(
+  Widget _buildGroupedCardContainer({
+    required BuildContext context,
+    required bool isDark,
+    required List<Widget> items,
+  }) {
+    final radius = AppTheme.cardRadius(context);
+    final strokeWidth = AppTheme.borderWidth(context);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? Theme.of(context).colorScheme.surface : Colors.white,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : AppColors.border,
+          width: strokeWidth,
+        ),
+      ),
+      child: Column(
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            items[i],
+            if (i < items.length - 1)
+              Divider(
+                height: 1,
+                thickness: 1,
+                indent: 52,
+                endIndent: 16,
+                color: isDark ? AppColors.darkBorder : AppColors.border.withOpacity(0.6),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionItem(
     BuildContext context, {
     required IconData icon,
-    Color? iconBgColor,
-    Color? iconColor,
     required String title,
     required String subtitle,
     String? badgeText,
-    required String route,
+    Widget? trailing,
+    required VoidCallback onTap,
     required bool isDark,
     required Color primaryColor,
   }) {
-    final cardRadius = AppTheme.cardRadius(context);
-    final strokeWidth = AppTheme.borderWidth(context);
-
     return InkWell(
-      onTap: () => context.push(route),
-      borderRadius: BorderRadius.circular(cardRadius),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1D1D2C) : Colors.white,
-          borderRadius: BorderRadius.circular(cardRadius),
-          border: Border.all(
-            color: isDark ? const Color(0xFF2C2C3F) : AppColors.border,
-            width: strokeWidth,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: iconBgColor ?? primaryColor.withOpacity(0.12),
+                color: isDark ? Colors.white10 : primaryColor.withOpacity(0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: iconColor ?? primaryColor,
-                size: 20,
+                color: primaryColor,
+                size: 18,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,8 +550,8 @@ class SettingsScreen extends ConsumerWidget {
                         child: Text(
                           title,
                           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
                               ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -531,16 +560,16 @@ class SettingsScreen extends ConsumerWidget {
                       if (badgeText != null) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: primaryColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            color: isDark ? Colors.white10 : const Color(0xFFF0F0F4),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             badgeText,
                             style: TextStyle(
-                              color: primaryColor,
-                              fontWeight: FontWeight.w800,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
                               fontSize: 10,
                             ),
                           ),
@@ -552,7 +581,8 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 12,
+                          fontSize: 11,
+                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -561,25 +591,28 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              CupertinoIcons.chevron_right,
-              size: 16,
-              color: isDark ? Colors.white54 : AppColors.textSecondary,
-            ),
+            if (trailing != null)
+              trailing
+            else
+              Icon(
+                CupertinoIcons.chevron_right,
+                size: 14,
+                color: isDark ? Colors.white38 : AppColors.textSecondary.withOpacity(0.7),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFooter(BuildContext context, Color primaryColor) {
+  Widget _buildFooter(BuildContext context, Color primaryColor, bool isDark) {
     return Center(
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(CupertinoIcons.sparkles, color: primaryColor, size: 16),
+              Icon(CupertinoIcons.sparkles, color: primaryColor, size: 15),
               const SizedBox(width: 6),
               Text(
                 'Dictionary',
@@ -592,8 +625,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Powered by Merriam-Webster & Riverpod State Engine',
-            style: Theme.of(context).textTheme.bodySmall,
+            'Version 1.0.0 • Riverpod & Merriam-Webster Engine',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11),
           ),
         ],
       ),

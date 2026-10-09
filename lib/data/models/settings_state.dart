@@ -22,6 +22,7 @@ class SettingsState {
   final String themeVariant; // 'standard', 'sepia', 'oled'
   final bool showBgBlobs;
   final String bgTexture; // 'none', 'dots', 'grid', 'crosshatch'
+  final double bgTextureOpacity; // 0.1 to 1.0 (default 0.8)
   final String appFontFamily; // 'SF Pro', 'SF Pro Display', 'SF Pro Rounded', 'Nunito', 'Inter', 'Lora', 'Fira Code'
   final String cardRadiusStyle; // 'sharp', 'rounded', 'pill'
   final String borderWidthStyle; // 'thin', 'standard', 'bold'
@@ -50,6 +51,7 @@ class SettingsState {
     this.themeVariant = 'standard',
     this.showBgBlobs = true,
     this.bgTexture = 'dots',
+    this.bgTextureOpacity = 0.8,
     this.appFontFamily = 'Nunito',
     this.cardRadiusStyle = 'rounded',
     this.borderWidthStyle = 'standard',
@@ -79,6 +81,7 @@ class SettingsState {
     String? themeVariant,
     bool? showBgBlobs,
     String? bgTexture,
+    double? bgTextureOpacity,
     String? appFontFamily,
     String? cardRadiusStyle,
     String? borderWidthStyle,
@@ -110,6 +113,7 @@ class SettingsState {
       themeVariant: themeVariant ?? this.themeVariant,
       showBgBlobs: showBgBlobs ?? this.showBgBlobs,
       bgTexture: bgTexture ?? this.bgTexture,
+      bgTextureOpacity: bgTextureOpacity ?? this.bgTextureOpacity,
       appFontFamily: appFontFamily ?? this.appFontFamily,
       cardRadiusStyle: cardRadiusStyle ?? this.cardRadiusStyle,
       borderWidthStyle: borderWidthStyle ?? this.borderWidthStyle,

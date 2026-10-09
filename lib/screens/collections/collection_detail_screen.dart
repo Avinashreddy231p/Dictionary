@@ -202,12 +202,14 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        ),
+        color: isDark ? const Color(0xFF181826) : Colors.white,
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -312,83 +314,307 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (ctx) {
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Export Collection Vocabulary',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(CupertinoIcons.xmark),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Choose a format to export ${words.length} vocabulary words:',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Option 1: Visual Poster Card Image Summary
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(CupertinoIcons.photo_fill_on_rectangle_fill, color: Colors.orange, size: 20),
+                    ),
+                    title: const Text('Visual Poster Card Summary', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Beautiful, shareable poster card with vocabulary list'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showSharePosterCardModal(context, words, widget.title);
+                    },
+                  ),
+                  const Divider(height: 1),
+
+                  // Option 2: Anki CSV Deck Format
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.softPurple,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(CupertinoIcons.rectangle_stack_fill, color: Colors.purple, size: 20),
+                    ),
+                    title: const Text('Anki Flashcard Deck CSV (.csv)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Export & share as .csv file for Anki app'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final csv = ExportService.exportToAnkiCsv(words);
+                      await ExportService.exportAndShareFile(
+                        context: context,
+                        filename: '${widget.title}_Anki.csv',
+                        content: csv,
+                        successMessage: 'Exported Anki Deck file (.csv)',
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+
+                  // Option 3: Printable PDF Document Format
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(CupertinoIcons.doc_richtext, color: Colors.redAccent, size: 20),
+                    ),
+                    title: const Text('Printable PDF Study Document (.pdf)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Export & share as .pdf document file'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
+                      await ExportService.exportAndShareFile(
+                        context: context,
+                        filename: '${widget.title}_StudySheet.pdf',
+                        content: sheet,
+                        successMessage: 'Exported PDF Study Document (.pdf)',
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+
+                  // Option 4: Formatted Study Sheet
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.softGreen,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(CupertinoIcons.doc_text_fill, color: Colors.green, size: 20),
+                    ),
+                    title: const Text('Formatted Study Sheet Text (.txt)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Export & share as .txt text file'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
+                      await ExportService.exportAndShareFile(
+                        context: context,
+                        filename: '${widget.title}_Notes.txt',
+                        content: sheet,
+                        successMessage: 'Exported Study Sheet file (.txt)',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white30 : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Export Collection Vocabulary',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Choose a format to export ${words.length} vocabulary words:',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 20),
+        );
+      },
+    );
+  }
 
-              // Option 1: Anki CSV Deck Format
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.softPurple,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(CupertinoIcons.rectangle_stack_fill, color: Colors.purple, size: 20),
-                ),
-                title: const Text('Anki Flashcard Deck CSV', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Compatible with Anki Desktop & Mobile app (.csv)'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  final csv = ExportService.exportToAnkiCsv(words);
-                  ExportService.copyToClipboard(context, csv, 'Anki CSV copied to clipboard!');
-                },
-              ),
-              const Divider(height: 1),
+  void _showSharePosterCardModal(BuildContext context, List<SavedWord> words, String title) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
 
-              // Option 2: Formatted Study Sheet
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.softGreen,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(CupertinoIcons.doc_text_fill, color: Colors.green, size: 20),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: isDark ? const Color(0xFF181826) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(CupertinoIcons.photo_fill_on_rectangle_fill, color: primaryColor, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text('Visual Poster Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(CupertinoIcons.xmark),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
                 ),
-                title: const Text('Formatted Study Sheet Text', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Clean printable text overview for study sheets'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
-                  ExportService.copyToClipboard(context, sheet, 'Study Sheet text copied to clipboard!');
-                },
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Poster Card Preview
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF232338) : const Color(0xFFF3EDFF),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: primaryColor.withOpacity(0.4), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withOpacity(0.15),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            title.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              color: primaryColor,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${words.length} Words',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: primaryColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      ...words.take(5).map((w) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('• ', style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor)),
+                              Expanded(
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: isDark ? Colors.white : AppColors.textPrimary,
+                                    ),
+                                    children: [
+                                      TextSpan(text: '${w.word}: ', style: const TextStyle(fontWeight: FontWeight.w900)),
+                                      TextSpan(text: w.meaning ?? 'Vocabulary word'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      if (words.length > 5) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '+ ${words.length - 5} more words in collection...',
+                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: primaryColor),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      elevation: 2,
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      final summary = ExportService.exportToFormattedStudySheet(words, title);
+                      await ExportService.exportAndShareFile(
+                        context: context,
+                        filename: '${title}_PosterCard.txt',
+                        content: summary,
+                        successMessage: 'Exported Visual Poster Summary file',
+                      );
+                    },
+                    icon: const Icon(CupertinoIcons.doc_on_doc, size: 18),
+                    label: const Text(
+                      'Copy Visual Poster Summary',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

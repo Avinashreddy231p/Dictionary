@@ -807,56 +807,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.primaryColor.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                CupertinoIcons.sparkles,
-                color: theme.primaryColor,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dictionary',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                Text(
-                  'Understand every word.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.primaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        Text(
+          'Dictionary',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontSize: 26,
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+            letterSpacing: -0.4,
+          ),
         ),
-        IconButton(
-          onPressed: () {
-            context.go('/settings');
-          },
-          icon: const Icon(CupertinoIcons.settings),
-          style: IconButton.styleFrom(
-            backgroundColor: theme.cardTheme.color,
-            side: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
+        const SizedBox(height: 3),
+        Text(
+          'Understand every word.',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+            fontSize: 13,
           ),
         ),
       ],
