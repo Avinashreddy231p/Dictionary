@@ -983,7 +983,7 @@ class AppearanceSettingsScreen extends ConsumerWidget {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Preview: LexiLens helps you master words effortlessly.',
+                                'Preview: Dictionary App helps you master words effortlessly.',
                                 style: TextStyle(
                                   fontSize: 14 * settings.fontScale,
                                   fontWeight: FontWeight.w600,

@@ -410,16 +410,18 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                       child: const Icon(CupertinoIcons.doc_richtext, color: Colors.redAccent, size: 20),
                     ),
                     title: const Text('Printable PDF Study Document (.pdf)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Export & share as .pdf document file'),
+                    subtitle: const Text('Export & share as a real binary .pdf document file'),
                     onTap: () async {
                       Navigator.pop(ctx);
-                      final sheet = ExportService.exportToFormattedStudySheet(words, widget.title);
-                      await ExportService.exportAndShareFile(
-                        context: context,
-                        filename: '${widget.title}_StudySheet.pdf',
-                        content: sheet,
-                        successMessage: 'Exported PDF Study Document (.pdf)',
-                      );
+                      final pdfBytes = await ExportService.generatePdfDocument(words, widget.title);
+                      if (context.mounted) {
+                        await ExportService.exportAndShareBytes(
+                          context: context,
+                          filename: '${widget.title}_StudySheet.pdf',
+                          bytes: pdfBytes,
+                          successMessage: 'Exported PDF Study Document (.pdf)',
+                        );
+                      }
                     },
                   ),
                   const Divider(height: 1),
