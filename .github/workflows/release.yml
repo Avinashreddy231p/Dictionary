@@ -41,9 +41,7 @@ jobs:
       - name: Organize Android APKs
         run: |
           mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-n8n_prod-arm64-v8a-release.apk artifacts/Dictionary-v2.3.1-Android-arm64-v8a.apk || true
-          cp build/app/outputs/flutter-apk/app-n8n_prod-armeabi-v7a-release.apk artifacts/Dictionary-v2.3.1-Android-armeabi-v7a.apk || true
-          cp build/app/outputs/flutter-apk/app-n8n_prod-x86_64-release.apk artifacts/Dictionary-v2.3.1-Android-x86_64.apk || true
+          find build/ -name "*.apk" -exec cp {} artifacts/ \;
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
@@ -78,7 +76,10 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath artifacts\Dictionary-v2.3.1-Windows-x64.zip
+          $releaseDir = Get-ChildItem -Path build\windows -Recurse -Directory -Filter "Release" | Select-Object -First 1
+          if ($releaseDir) {
+              Compress-Archive -Path "$($releaseDir.FullName)\*" -DestinationPath artifacts\Dictionary-v2.3.1-Windows-x64.zip
+          }
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -117,7 +118,10 @@ jobs:
       - name: Package Linux Tarball
         run: |
           mkdir -p artifacts
-          tar -czvf artifacts/Dictionary-v2.3.1-Linux-x64.tar.gz -C build/linux/x64/release/bundle .
+          BUNDLE_DIR=$(find build/linux -type d -name "bundle" | head -n 1)
+          if [ -n "$BUNDLE_DIR" ]; then
+            tar -czvf artifacts/Dictionary-v2.3.1-Linux-x64.tar.gz -C "$BUNDLE_DIR" .
+          fi
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -148,10 +152,12 @@ jobs:
       - name: Package iOS Payload Zip
         run: |
           mkdir -p artifacts
-          cd build/ios/iphoneos
-          mkdir -p Payload
-          cp -r Runner.app Payload/
-          zip -r ../../../artifacts/Dictionary-v2.3.1-iOS-Unsigned.ipa Payload
+          APP_DIR=$(find build/ios -type d -name "Runner.app" | head -n 1)
+          if [ -n "$APP_DIR" ]; then
+            mkdir -p Payload
+            cp -r "$APP_DIR" Payload/
+            zip -r artifacts/Dictionary-v2.3.1-iOS-Unsigned.ipa Payload
+          fi
 
       - name: Upload iOS Artifacts
         uses: actions/upload-artifact@v4
@@ -163,6 +169,7 @@ jobs:
   publish-release:
     name: Create & Publish Multi-Platform Release
     needs: [build-android, build-windows, build-linux, build-ios]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -170,24 +177,28 @@ jobs:
 
       - name: Download Android Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: android-apks
           path: release-binaries
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: windows-app
           path: release-binaries
 
       - name: Download Linux Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: linux-app
           path: release-binaries
 
       - name: Download iOS Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: ios-app
           path: release-binaries
@@ -205,9 +216,9 @@ jobs:
             🎉 **Dictionary Multi-Platform Release Build (v2.3.1)**
 
             ### 📱 Android Release Builds:
-            * **ARM64 (64-bit)**: `Dictionary-v2.3.1-Android-arm64-v8a.apk` *(Recommended for modern Android phones)*
-            * **ARMv7 (32-bit)**: `Dictionary-v2.3.1-Android-armeabi-v7a.apk` *(Legacy Android devices)*
-            * **x86_64 (64-bit)**: `Dictionary-v2.3.1-Android-x86_64.apk` *(Emulators & Chromebooks)*
+            * **ARM64 (64-bit)**: `app-n8n_prod-arm64-v8a-release.apk` *(Recommended for modern Android phones)*
+            * **ARMv7 (32-bit)**: `app-n8n_prod-armeabi-v7a-release.apk` *(Legacy Android devices)*
+            * **x86_64 (64-bit)**: `app-n8n_prod-x86_64-release.apk` *(Emulators & Chromebooks)*
 
             ### 💻 Desktop Release Builds:
             * **🪟 Windows (x64)**: `Dictionary-v2.3.1-Windows-x64.zip`
