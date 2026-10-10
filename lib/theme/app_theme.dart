@@ -105,7 +105,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: Colors.transparent,
+      scaffoldBackgroundColor: bg,
       primaryColor: accentColor,
       colorScheme: ColorScheme.light(
         primary: accentColor,

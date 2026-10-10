@@ -14,14 +14,17 @@ class BackgroundTextureWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (texture == 'none' || texture.isEmpty || opacity <= 0) {
-      return child;
-    }
-
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final bgColor = theme.colorScheme.background;
+
+    if (texture == 'none' || texture.isEmpty || opacity <= 0) {
+      return ColoredBox(
+        color: bgColor,
+        child: child,
+      );
+    }
+
     final baseAlpha = isDark ? 0.24 : 0.16;
     final patternColor = (isDark ? Colors.white : Colors.black)
         .withOpacity((baseAlpha * opacity).clamp(0.0, 1.0));
