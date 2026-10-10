@@ -238,6 +238,7 @@ jobs:
           name: Dictionary Release ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v2.3.1' }}
           draft: false
           prerelease: false
+          overwrite: true
           files: release-binaries/*
           body: |
             🎉 **Dictionary Multi-Platform Release Build (v2.3.1)**
