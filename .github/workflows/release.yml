@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  # 1. ANDROID BUILD (Universal + Split ABIs)
+  # 1. ANDROID BUILD
   build-android:
     name: Build Android APKs
     runs-on: ubuntu-latest
@@ -61,6 +61,7 @@ jobs:
         with:
           name: android-apks
           path: artifacts/*
+          if-no-files-found: ignore
 
   # 2. WINDOWS BUILD
   build-windows:
@@ -89,9 +90,16 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          $releaseDir = Get-ChildItem -Path build\windows -Recurse -Directory -Filter "Release" | Select-Object -First 1
+          $releaseDir = Get-ChildItem -Path build\windows -Recurse -Directory | Where-Object { $_.Name -eq "Release" -and $_.FullName -notlike "*CMakeFiles*" } | Select-Object -First 1
           if ($releaseDir) {
+              Write-Host "Packaging Windows Release directory: $($releaseDir.FullName)"
               Compress-Archive -Path "$($releaseDir.FullName)\*" -DestinationPath artifacts\Dictionary-v2.3.1-Windows-x64.zip
+          } else {
+              $exe = Get-ChildItem -Path build\windows -Recurse -Filter "*.exe" | Where-Object { $_.FullName -notlike "*CMakeFiles*" } | Select-Object -First 1
+              if ($exe) {
+                  Write-Host "Packaging Windows Exe directory: $($exe.DirectoryName)"
+                  Compress-Archive -Path "$($exe.DirectoryName)\*" -DestinationPath artifacts\Dictionary-v2.3.1-Windows-x64.zip
+              }
           }
 
       - name: Upload Windows Artifacts
@@ -99,6 +107,7 @@ jobs:
         with:
           name: windows-app
           path: artifacts/*
+          if-no-files-found: ignore
 
   # 3. LINUX BUILD
   build-linux:
@@ -132,6 +141,9 @@ jobs:
         run: |
           mkdir -p artifacts
           BUNDLE_DIR=$(find build/linux -type d -name "bundle" | head -n 1)
+          if [ -z "$BUNDLE_DIR" ]; then
+            BUNDLE_DIR=$(find build/linux -type f -name "dictionary" -exec dirname {} \; | grep -v "CMakeFiles" | head -n 1)
+          fi
           if [ -n "$BUNDLE_DIR" ]; then
             tar -czvf artifacts/Dictionary-v2.3.1-Linux-x64.tar.gz -C "$BUNDLE_DIR" .
           fi
@@ -141,6 +153,7 @@ jobs:
         with:
           name: linux-app
           path: artifacts/*
+          if-no-files-found: ignore
 
   # 4. IOS BUILD
   build-ios:
@@ -177,6 +190,7 @@ jobs:
         with:
           name: ios-app
           path: artifacts/*
+          if-no-files-found: ignore
 
   # 5. CREATE GITHUB RELEASE WITH ALL PLATFORM BINARIES
   publish-release:
