@@ -38,10 +38,20 @@ jobs:
       - name: Build Split-per-ABI Release APKs
         run: flutter build apk --flavor n8n_prod --release --split-per-abi
 
-      - name: Organize Android APKs
+      - name: Organize & Rename Android APKs
         run: |
           mkdir -p artifacts
-          find build/ -name "*.apk" -exec cp {} artifacts/ \;
+          for file in $(find build/ -name "*.apk"); do
+            if [[ "$file" == *"arm64-v8a"* ]]; then
+              cp "$file" artifacts/Dictionary-v2.3.1-arm64-v8a.apk
+            elif [[ "$file" == *"armeabi-v7a"* ]]; then
+              cp "$file" artifacts/Dictionary-v2.3.1-armeabi-v7a.apk
+            elif [[ "$file" == *"x86_64"* ]]; then
+              cp "$file" artifacts/Dictionary-v2.3.1-x86_64.apk
+            else
+              cp "$file" artifacts/Dictionary-v2.3.1-universal.apk
+            fi
+          done
 
       - name: Upload Android Artifacts
         uses: actions/upload-artifact@v4
@@ -216,9 +226,9 @@ jobs:
             🎉 **Dictionary Multi-Platform Release Build (v2.3.1)**
 
             ### 📱 Android Release Builds:
-            * **ARM64 (64-bit)**: `app-n8n_prod-arm64-v8a-release.apk` *(Recommended for modern Android phones)*
-            * **ARMv7 (32-bit)**: `app-n8n_prod-armeabi-v7a-release.apk` *(Legacy Android devices)*
-            * **x86_64 (64-bit)**: `app-n8n_prod-x86_64-release.apk` *(Emulators & Chromebooks)*
+            * **ARM64 (64-bit)**: `Dictionary-v2.3.1-arm64-v8a.apk` *(Recommended for modern Android smartphones)*
+            * **ARMv7 (32-bit)**: `Dictionary-v2.3.1-armeabi-v7a.apk` *(Legacy Android devices)*
+            * **x86_64 (64-bit)**: `Dictionary-v2.3.1-x86_64.apk` *(Emulators & Chromebooks)*
 
             ### 💻 Desktop Release Builds:
             * **🪟 Windows (x64)**: `Dictionary-v2.3.1-Windows-x64.zip`
@@ -226,12 +236,5 @@ jobs:
 
             ### 🍏 iOS Release Build:
             * **🍏 iOS**: `Dictionary-v2.3.1-iOS-Unsigned.ipa` *(Unsigned IPA for Sideloading / AltStore / TestFlight)*
-
-            ---
-            ### ✨ Highlights in this release:
-            * ⚡ **Performance**: Zero-lag card navigation & post-frame async data loading.
-            * 📚 **Content**: Curated **Advanced C1 & C2 Vocabulary** initial seed collection.
-            * 🎙️ **Voice**: On-demand speech recognition & pronunciation evaluator.
-            * 🎨 **Design**: Material 3 styling with 60+ Pantone accent color themes.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
