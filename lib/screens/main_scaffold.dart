@@ -22,13 +22,22 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     final now = DateTime.now();
 
     if (index == 0) {
-      _lastSearchTap = now;
-
-      // Navigate to /home/search route directly
-      context.go('/home/search');
-
-      // Trigger focus and keyboard popup in SearchScreen
-      ref.read(searchFocusTriggerProvider.notifier).trigger();
+      if (currentIndex != 0) {
+        if (_lastSearchTap != null && now.difference(_lastSearchTap!) < const Duration(milliseconds: 600)) {
+          // Double click detected -> open Search
+          _lastSearchTap = null;
+          context.go('/home/search');
+          ref.read(searchFocusTriggerProvider.notifier).trigger();
+        } else {
+          // Single click from another screen -> open Home
+          _lastSearchTap = now;
+          context.go('/home');
+        }
+      } else {
+        // Already on home tab -> open Search
+        context.go('/home/search');
+        ref.read(searchFocusTriggerProvider.notifier).trigger();
+      }
       return;
     }
 

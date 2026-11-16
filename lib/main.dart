@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_edge_ai/flutter_edge_ai.dart';
+import 'package:flutter_edge_ai_litertlm/flutter_edge_ai_litertlm.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/providers/settings_provider.dart';
@@ -9,6 +11,15 @@ import 'routing/app_router.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+
+  try {
+    await FlutterEdgeAi.initialize(
+      inferenceEngines: [LiteRtLmEngine()],
+      embeddingBackends: const [LiteRtEmbeddingBackend()],
+    );
+  } catch (e) {
+    debugPrint('LiteRT-LM Initialization Warning: $e');
+  }
 
   runApp(
     ProviderScope(

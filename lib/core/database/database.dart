@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
@@ -54,6 +56,7 @@ class SavedWords extends Table {
   IntColumn get reviewState => integer().withDefault(const Constant(0))(); // 0 = Learning, 1 = Review, 2 = Known
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
   TextColumn get source => text().nullable()();
+  BlobColumn get embedding => blob().nullable()();
 }
 
 class Collections extends Table {
@@ -88,7 +91,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -98,6 +101,9 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 3) {
         await m.addColumn(collections, collections.tags);
+      }
+      if (from < 4) {
+        await m.addColumn(savedWords, savedWords.embedding);
       }
     },
   );
@@ -190,6 +196,16 @@ class AppDatabase extends _$AppDatabase {
   }) async {
     final existing = await getSavedWordByWord(word);
     if (existing != null) {
+      await (update(savedWords)..where((t) => t.id.equals(existing.id))).write(
+        SavedWordsCompanion(
+          phonetic: (phonetic != null && phonetic.isNotEmpty) ? Value(phonetic) : Value(existing.phonetic),
+          partOfSpeech: (partOfSpeech != null && partOfSpeech.isNotEmpty) ? Value(partOfSpeech) : Value(existing.partOfSpeech),
+          meaning: (meaning != null && meaning.isNotEmpty) ? Value(meaning) : Value(existing.meaning),
+          example: (example != null && example.isNotEmpty) ? Value(example) : Value(existing.example),
+          syllables: (syllables != null && syllables.isNotEmpty) ? Value(syllables) : Value(existing.syllables),
+          cefr: (cefr != null && cefr.isNotEmpty) ? Value(cefr) : Value(existing.cefr),
+        ),
+      );
       return existing.id;
     }
     return into(savedWords).insert(SavedWordsCompanion.insert(
@@ -213,6 +229,46 @@ class AppDatabase extends _$AppDatabase {
     await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
       SavedWordsCompanion(personalNote: Value(note)),
     );
+  }
+
+  Future<void> updateSavedWordEmbedding(int savedWordId, Uint8List embedding) async {
+    await (update(savedWords)..where((t) => t.id.equals(savedWordId))).write(
+      SavedWordsCompanion(embedding: Value(embedding)),
+    );
+  }
+
+  Future<List<SavedWord>> searchSavedWordsByEmbedding(Float32List queryEmbedding, {int limit = 10}) async {
+    final allWords = await (select(savedWords)..where((t) => t.embedding.isNotNull())).get();
+    
+    // Sort words by cosine similarity
+    final wordScores = <SavedWord, double>{};
+    for (final word in allWords) {
+      final embeddingBytes = word.embedding!;
+      final wordEmbedding = Float32List.view(embeddingBytes.buffer);
+      if (wordEmbedding.length == queryEmbedding.length) {
+        double dotProduct = 0.0;
+        double normA = 0.0;
+        double normB = 0.0;
+        for (int i = 0; i < queryEmbedding.length; i++) {
+          dotProduct += queryEmbedding[i] * wordEmbedding[i];
+          normA += queryEmbedding[i] * queryEmbedding[i];
+          normB += wordEmbedding[i] * wordEmbedding[i];
+        }
+        if (normA > 0 && normB > 0) {
+          final similarity = dotProduct / (sqrt(normA) * sqrt(normB));
+          wordScores[word] = similarity;
+        }
+      }
+    }
+    
+    var sortedWords = wordScores.keys.toList();
+    sortedWords.sort((a, b) => wordScores[b]!.compareTo(wordScores[a]!));
+    
+    if (sortedWords.length > limit) {
+      sortedWords = sortedWords.sublist(0, limit);
+    }
+    
+    return sortedWords;
   }
 
   Future<void> removeSavedWord(String word) async {

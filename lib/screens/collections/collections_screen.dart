@@ -786,6 +786,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
       decoration: InputDecoration(
         hintText: 'Search your collections or tags...',
         prefixIcon: Icon(CupertinoIcons.search, color: isDark ? Colors.white60 : AppColors.textSecondary),
+        filled: false,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(50),
           borderSide: BorderSide(color: AppColors.cardBorder(context), width: 1.5),
@@ -850,7 +851,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                   });
                 }
               },
-              backgroundColor: theme.cardTheme.color,
+              backgroundColor: theme.scaffoldBackgroundColor,
               selectedColor: theme.primaryColor,
               labelStyle: theme.textTheme.bodyMedium?.copyWith(
                     color: isSelected
@@ -1489,7 +1490,7 @@ class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: theme.scaffoldBackgroundColor,
         border: isPinned
             ? Border(bottom: BorderSide(color: AppColors.cardBorder(context), width: 1.5))
             : null,

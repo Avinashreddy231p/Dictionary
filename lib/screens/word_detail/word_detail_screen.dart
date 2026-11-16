@@ -12,10 +12,13 @@ import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import '../../core/database/database.dart';
 import '../../core/providers.dart';
 import '../../core/utils/pos_helper.dart';
 import '../../core/utils/url_helper.dart';
+import '../../data/services/ai_service.dart';
+import '../../data/services/on_device_ai_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_accents.dart';
 import '../../theme/background_patterns.dart';
@@ -73,6 +76,11 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   String? _activeCustomPromptType;
   String? _aiErrorMsg;
 
+  // AI Sentence Coach State
+  final TextEditingController _sentenceCoachController = TextEditingController();
+  String? _sentenceEvaluationResult;
+  bool _isEvaluatingSentence = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,9 +98,20 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   }
 
   void _logWordVisited() {
-    final word = widget.entry?.core.headword ?? widget.initialWord;
+    final entry = widget.entry ?? _fetchedEntry;
+    final word = entry?.core.headword ?? widget.initialWord;
     if (word != null && word.trim().isNotEmpty) {
-      ref.read(databaseProvider).addRecentSearch(word.trim().toLowerCase());
+      final cleanWord = word.trim().toLowerCase();
+      final db = ref.read(databaseProvider);
+      db.addRecentSearch(cleanWord);
+      db.saveWord(
+        word: cleanWord,
+        phonetic: entry?.core.phonetic,
+        partOfSpeech: entry?.core.partOfSpeech,
+        meaning: entry?.dictionaryLayer.simpleMeaning,
+        example: entry?.dictionaryLayer.contextualMeaning,
+        syllables: entry?.core.syllables.join('*'),
+      );
     }
   }
 
@@ -101,6 +120,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     _aiStreamSubscription?.cancel();
     _audioPlayer.dispose();
     _noteController.dispose();
+    _sentenceCoachController.dispose();
     super.dispose();
   }
 
@@ -114,6 +134,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
           setState(() {
             _fetchedEntry = results.first;
           });
+          _logWordVisited();
         }
       } catch (_) {}
       if (mounted) setState(() => _isLoadingWord = false);
@@ -296,6 +317,22 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
 
         final newSaved = await db.getSavedWordByWord(word);
         if (newSaved != null && mounted) {
+          
+          // Generate embedding for reverse search if engine is ready
+          final aiService = ref.read(onDeviceAiServiceProvider);
+          final settings = ref.read(settingsProvider);
+          final embedModelId = OnDeviceAiService.availableEmbeddingModels.first.id;
+          
+          if (await aiService.isEmbeddingModelReady(embedModelId)) {
+            final embedText = '${entry.core.headword}: ${entry.dictionaryLayer.simpleMeaning}';
+            final vector = await aiService.generateEmbedding(embedText, embedModelId);
+            if (vector != null) {
+              final bytes = Uint8List.view(vector.buffer);
+              await db.updateSavedWordEmbedding(newSaved.id, bytes);
+            }
+          }
+
+          if (!mounted) return;
           _showCollectionsSheet(context, ref, newSaved);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1057,12 +1094,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Context Card
-                    _FluidAnimatedCard(
-                      index: cardIndex++,
-                      child: _SafeCard(builder: () => _buildContextCard(context, word)),
-                    ),
-                    const SizedBox(height: 16),
+                    // Context Card (Only if AI is enabled)
+                    if (ref.read(settingsProvider).geminiAiEnabled) ...[
+                      _FluidAnimatedCard(
+                        index: cardIndex++,
+                        child: _SafeCard(builder: () => _buildContextCard(context, entry)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     if (allExamples.isNotEmpty) ...[
                       _FluidAnimatedCard(
@@ -1106,6 +1145,13 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                     _FluidAnimatedCard(
                       index: cardIndex++,
                       child: _SafeCard(builder: () => _buildGeminiAiCard(context, ref, entry)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // AI Sentence Coach Card
+                    _FluidAnimatedCard(
+                      index: cardIndex++,
+                      child: _SafeCard(builder: () => _buildSentenceCoachCard(context, entry.core.headword)),
                     ),
                     const SizedBox(height: 16),
 
@@ -1715,9 +1761,12 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     );
   }
 
-  Widget _buildContextCard(BuildContext context, String word) {
+  Widget _buildContextCard(BuildContext context, LexicalEntry entry) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final hasGeneratedContext = _aiExamplesResult != null && _aiExamplesResult!.isNotEmpty;
+    final isGeneratingContext = _isAiStreaming && _activeCustomPromptType != 'nuance' && _activeCustomPromptType != 'mnemonic';
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1741,35 +1790,112 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(CupertinoIcons.chevron_right,
-                  size: 16,
-                  color: isDark ? Colors.white54 : AppColors.textPrimary),
-            ],
-          ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
-              style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondary,
-                    height: 1.4,
+              _BouncyTouch(
+                onTap: () {
+                  if (_isAiStreaming) return;
+                  _triggerExamplesStream(context, ref, entry);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isGeneratingContext 
+                           ? theme.primaryColor.withOpacity(0.1) 
+                           : theme.primaryColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: isGeneratingContext ? [] : [
+                      BoxShadow(
+                        color: theme.primaryColor.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      )
+                    ],
                   ),
-              children: [
-                const TextSpan(text: 'He was '),
-                TextSpan(
-                  text: word.toLowerCase(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: theme.primaryColor,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isGeneratingContext) ...[
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: theme.primaryColor),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Generating...',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                      ] else ...[
+                        Icon(
+                          CupertinoIcons.sparkles,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          hasGeneratedContext ? 'Regenerate' : 'AI Generate',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ]
+                    ],
                   ),
                 ),
-                const TextSpan(
-                    text:
-                        ' to enter the room, even though he knew it was important.'),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+          if (hasGeneratedContext)
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOutQuart,
+              alignment: Alignment.topCenter,
+              child: MarkdownBody(
+                data: '${_aiExamplesResult!}${isGeneratingContext ? ' █' : ''}',
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.5,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary,
+                  ),
+                  strong: TextStyle(fontWeight: FontWeight.w800, color: theme.primaryColor),
+                  listBullet: TextStyle(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary, fontWeight: FontWeight.w800),
+                  pPadding: const EdgeInsets.only(bottom: 8),
+                ),
+              ),
+            )
+          else if (!isGeneratingContext)
+            RichText(
+              text: TextSpan(
+                style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondary,
+                      height: 1.4,
+                      fontStyle: FontStyle.italic,
+                    ),
+                children: [
+                  const TextSpan(text: 'Tap the '),
+                  const TextSpan(text: 'AI Generate', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const TextSpan(text: ' button to create custom contextual sentences for '),
+                  TextSpan(
+                    text: entry.core.headword.toLowerCase(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                  const TextSpan(text: '.'),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -2548,6 +2674,28 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                side: BorderSide(color: theme.primaryColor),
+              ),
+              onPressed: () {
+                final headword = widget.entry?.core.headword ?? widget.initialWord ?? '';
+                if (headword.isNotEmpty) {
+                  context.push('/etymology/$headword');
+                }
+              },
+              icon: Icon(CupertinoIcons.tree, size: 18, color: theme.primaryColor),
+              label: Text(
+                'Explore AI Root Graph & Evolution Tree',
+                style: TextStyle(fontWeight: FontWeight.w800, color: theme.primaryColor),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2566,12 +2714,14 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
   void _startAiStream({
     required BuildContext context,
     required WidgetRef ref,
-    required Stream<String> Function(String apiKey, String? model) streamBuilder,
+    required Stream<String> Function() streamBuilder,
     required void Function(String chunk, bool isFirst) onChunk,
-  }) {
-    final settings = ref.read(settingsProvider);
-    final apiKey = settings.geminiApiKey;
-    if (apiKey.isEmpty) {
+  }) async {
+    final aiService = ref.read(aiServiceProvider);
+    
+    // Check if any AI engine is ready (either On-Device downloaded OR Cloud API Key exists)
+    final isAiAvailable = await aiService.isAiAvailable();
+    if (!isAiAvailable && mounted) {
       _showApiKeyPrompt(context);
       return;
     }
@@ -2586,7 +2736,7 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     bool isFirst = true;
 
     try {
-      final stream = streamBuilder(apiKey, settings.geminiModel);
+      final stream = streamBuilder();
       _aiStreamSubscription = stream.listen(
         (chunk) {
           if (mounted) {
@@ -2627,11 +2777,9 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     _startAiStream(
       context: context,
       ref: ref,
-      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamMnemonic(
+      streamBuilder: () => ref.read(aiServiceProvider).streamMnemonic(
         entry.core.headword,
         entry.dictionaryLayer.simpleMeaning,
-        apiKey: apiKey,
-        model: model,
       ),
       onChunk: (chunk, isFirst) {
         if (isFirst) {
@@ -2647,12 +2795,10 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     _startAiStream(
       context: context,
       ref: ref,
-      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamExplainNuance(
+      streamBuilder: () => ref.read(aiServiceProvider).streamExplainNuance(
         entry.core.headword,
         entry.core.partOfSpeech,
         entry.dictionaryLayer.simpleMeaning,
-        apiKey: apiKey,
-        model: model,
       ),
       onChunk: (chunk, isFirst) {
         if (isFirst) {
@@ -2668,17 +2814,28 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     _startAiStream(
       context: context,
       ref: ref,
-      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamContextExamples(
+      streamBuilder: () => ref.read(aiServiceProvider).streamContextExamples(
         entry.core.headword,
         entry.core.partOfSpeech,
-        apiKey: apiKey,
-        model: model,
       ),
       onChunk: (chunk, isFirst) {
         if (isFirst) {
           _aiExamplesResult = chunk;
         } else {
           _aiExamplesResult = (_aiExamplesResult ?? '') + chunk;
+        }
+        // Basic parser to make sure the target word is bolded in the output string
+        // so `flutter_markdown` renders it in primaryColor using `strong` tag
+        if (_aiExamplesResult != null) {
+          final wordRegex = RegExp('(${entry.core.headword})', caseSensitive: false);
+          _aiExamplesResult = _aiExamplesResult!.replaceAllMapped(wordRegex, (match) {
+            final matchString = match.group(1);
+            // check if it is already wrapped in ** to prevent ** **
+            if (matchString != null && !matchString.contains('**')) {
+                return '**$matchString**';
+            }
+            return matchString ?? '';
+          });
         }
       },
     );
@@ -2689,11 +2846,9 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     _startAiStream(
       context: context,
       ref: ref,
-      streamBuilder: (apiKey, model) => ref.read(geminiServiceProvider).streamCustomPrompt(
+      streamBuilder: () => ref.read(aiServiceProvider).streamCustomPrompt(
         entry.core.headword,
         promptType,
-        apiKey: apiKey,
-        model: model,
       ),
       onChunk: (chunk, isFirst) {
         if (isFirst) {
@@ -2718,41 +2873,56 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
     final cleanText = (text ?? '').trim();
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: primaryColor.withOpacity(0.15),
+          width: 1.5,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RichText(
-            text: TextSpan(
-              text: cleanText,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.45,
-                fontWeight: FontWeight.w600,
-                color: textColor,
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutQuart,
+            alignment: Alignment.topCenter,
+            child: MarkdownBody(
+              data: '$cleanText${isStreaming ? ' █' : ''}',
+              styleSheet: MarkdownStyleSheet(
+                p: TextStyle(
+                  fontSize: 15,
+                  height: 1.6,
+                  fontWeight: FontWeight.w500,
+                  color: textColor.withOpacity(0.9),
+                ),
+                h1: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: primaryColor, height: 1.3),
+                h2: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: primaryColor, height: 1.3),
+                h3: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: textColor, height: 1.3),
+                strong: TextStyle(fontWeight: FontWeight.w800, color: primaryColor),
+                em: TextStyle(fontStyle: FontStyle.italic, color: textColor.withOpacity(0.8)),
+                listBullet: TextStyle(color: primaryColor, fontWeight: FontWeight.w800, fontSize: 16),
+                blockquote: TextStyle(
+                  fontSize: 15,
+                  fontStyle: FontStyle.italic,
+                  color: textColor.withOpacity(0.7),
+                ),
+                blockquoteDecoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: primaryColor, width: 4)),
+                  color: primaryColor.withOpacity(0.05),
+                ),
+                pPadding: const EdgeInsets.only(bottom: 12),
+                h1Padding: const EdgeInsets.only(top: 16, bottom: 8),
+                h2Padding: const EdgeInsets.only(top: 16, bottom: 8),
+                h3Padding: const EdgeInsets.only(top: 12, bottom: 6),
+                listIndent: 24,
+                blockquotePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              children: [
-                if (isStreaming)
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Container(
-                      margin: const EdgeInsets.only(left: 4),
-                      width: 8,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-              ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -3203,6 +3373,154 @@ class _WordDetailScreenState extends ConsumerState<WordDetailScreen> {
             },
             child: const Text('Open Settings'),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _evaluateUserSentence(String word) async {
+    final text = _sentenceCoachController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _isEvaluatingSentence = true;
+      _sentenceEvaluationResult = '';
+    });
+
+    try {
+      final aiService = ref.read(aiServiceProvider);
+      final stream = aiService.streamSentenceEvaluation(word, text);
+      await for (final chunk in stream) {
+        if (!mounted) return;
+        setState(() {
+          _sentenceEvaluationResult = (_sentenceEvaluationResult ?? '') + chunk;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sentenceEvaluationResult = 'Error evaluating sentence: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEvaluatingSentence = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildSentenceCoachCard(BuildContext context, String word) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.cardBorder(context), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(CupertinoIcons.pencil_outline, color: primaryColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Sentence Coach ("Write & Correct")',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      'Practice writing a sentence using "$word"',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _sentenceCoachController,
+            maxLines: 2,
+            decoration: InputDecoration(
+              hintText: 'Type your sentence using "$word"...',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              onPressed: _isEvaluatingSentence ? null : () => _evaluateUserSentence(word),
+              icon: _isEvaluatingSentence
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(CupertinoIcons.sparkles, size: 16),
+              label: Text(
+                _isEvaluatingSentence ? 'Evaluating with AI...' : 'Evaluate Sentence with AI',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          if (_sentenceEvaluationResult != null && _sentenceEvaluationResult!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(CupertinoIcons.checkmark_seal_fill, color: Colors.green, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'AI Feedback & Correction',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: primaryColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  MarkdownBody(
+                    data: _sentenceEvaluationResult!,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white70 : AppColors.textPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

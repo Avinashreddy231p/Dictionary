@@ -11,6 +11,7 @@ import '../../core/utils/pos_helper.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
 import '../collections/collection_detail_screen.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 const Set<String> _stopWords = {
   'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'aren\'t', 'as', 'at',
@@ -403,6 +404,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final titleController = TextEditingController(text: 'Pasted Excerpt');
 
     bool isAnalyzing = false;
+    String aiAnalysisResult = '';
     List<Map<String, String>> extractedCandidateWords = [];
     Set<String> selectedWords = {};
     final AudioPlayer audioPlayer = AudioPlayer();
@@ -451,7 +453,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
-                            'Smart Reader & Vocab Extractor',
+                            'Smart AI Reader & Vocab Extractor',
                             style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -579,6 +581,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SizedBox(height: 16),
                     ],
 
+                    // AI Excerpt Analysis Result Card
+                    if (aiAnalysisResult.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E1E2C) : Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: primaryColor.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(CupertinoIcons.sparkles, color: primaryColor, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'AI Excerpt Summary & Vocab Breakdown',
+                                  style: TextStyle(fontWeight: FontWeight.w900, color: primaryColor, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            MarkdownBody(
+                              data: aiAnalysisResult,
+                              styleSheet: MarkdownStyleSheet(
+                                p: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white70 : AppColors.textPrimary),
+                                h3: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primaryColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
                     // Candidate Words Pre-Save Checklist
                     if (extractedCandidateWords.isNotEmpty) ...[
                       Text(
@@ -662,30 +701,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ? null
                               : () async {
                                   setSheetState(() => isAnalyzing = true);
-                                  final db = ref.read(databaseProvider);
+                                  try {
+                                    final aiService = ref.read(aiServiceProvider);
+                                    final stream = aiService.streamExcerptAnalysis(rawText);
+                                    String accumulated = '';
+                                    await for (final chunk in stream) {
+                                      accumulated += chunk;
+                                      setSheetState(() {
+                                        aiAnalysisResult = accumulated;
+                                      });
+                                    }
 
-                                  final candidates = rawText
-                                      .replaceAll(RegExp(r'[^\w\s]'), '')
-                                      .split(RegExp(r'\s+'))
-                                      .where((w) => w.length > 3 && !_stopWords.contains(w.toLowerCase()))
-                                      .map((w) => w.toLowerCase())
-                                      .toSet()
-                                      .take(10);
+                                    final db = ref.read(databaseProvider);
+                                    final candidates = rawText
+                                        .replaceAll(RegExp(r'[^\w\s]'), '')
+                                        .split(RegExp(r'\s+'))
+                                        .where((w) => w.length > 3 && !_stopWords.contains(w.toLowerCase()))
+                                        .map((w) => w.toLowerCase())
+                                        .toSet()
+                                        .take(10);
 
-                                  List<Map<String, String>> resolved = [];
-                                  for (var w in candidates) {
-                                    final entry = await db.getOfflineWord(w);
-                                    final meaning = entry?.senses.isNotEmpty == true
-                                        ? entry!.senses.first.definition
-                                        : 'Extracted term from reading excerpt';
-                                    resolved.add({'word': w, 'meaning': meaning});
+                                    List<Map<String, String>> resolved = [];
+                                    for (var w in candidates) {
+                                      final entry = await db.getOfflineWord(w);
+                                      final meaning = entry?.senses.isNotEmpty == true
+                                          ? entry!.senses.first.definition
+                                          : 'Extracted term from reading excerpt';
+                                      resolved.add({'word': w, 'meaning': meaning});
+                                    }
+
+                                    setSheetState(() {
+                                      extractedCandidateWords = resolved;
+                                      selectedWords = resolved.map((e) => e['word']!).toSet();
+                                      isAnalyzing = false;
+                                    });
+                                  } catch (e) {
+                                    setSheetState(() => isAnalyzing = false);
                                   }
-
-                                  setSheetState(() {
-                                    extractedCandidateWords = resolved;
-                                    selectedWords = resolved.map((e) => e['word']!).toSet();
-                                    isAnalyzing = false;
-                                  });
                                 },
                           icon: isAnalyzing
                               ? const SizedBox(
@@ -695,7 +747,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 )
                               : const Icon(CupertinoIcons.sparkles, size: 18),
                           label: Text(
-                            isAnalyzing ? 'Analyzing Text...' : 'Analyze & Extract Vocabulary',
+                            isAnalyzing ? 'Analyzing Text with AI...' : 'Analyze & Extract Vocabulary',
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                           ),
                         ),
@@ -762,8 +814,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ],
-                  ],
-                ),
+                  ],                ),
               ),
             );
           },

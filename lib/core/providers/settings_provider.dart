@@ -68,6 +68,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
   static const _keyGeminiApiKey = 'settings_gemini_api_key';
   static const _keyGeminiAiEnabled = 'settings_gemini_ai_enabled';
   static const _keyGeminiModel = 'settings_gemini_model';
+  static const _keyAiProviderMode = 'settings_ai_provider_mode';
+  static const _keyOnDeviceModel = 'settings_on_device_model';
   static const _keyThemeVariant = 'settings_theme_variant';
   static const _keyShowBgBlobs = 'settings_show_bg_blobs';
   static const _keyBgTexture = 'settings_bg_texture';
@@ -113,6 +115,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final geminiApiKey = _prefs.getString(_keyGeminiApiKey) ?? '';
     final geminiAiEnabled = _prefs.getBool(_keyGeminiAiEnabled) ?? true;
     final geminiModel = _prefs.getString(_keyGeminiModel) ?? 'gemini-2.0-flash';
+    final aiProviderMode = _prefs.getString(_keyAiProviderMode) ?? 'hybrid_auto';
+    final onDeviceModel = _prefs.getString(_keyOnDeviceModel) ?? 'gemma3_270m';
     final themeVariant = _prefs.getString(_keyThemeVariant) ?? 'standard';
     final showBgBlobs = _prefs.getBool(_keyShowBgBlobs) ?? true;
     final bgTexture = _prefs.getString(_keyBgTexture) ?? 'dots';
@@ -146,6 +150,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
       geminiApiKey: geminiApiKey,
       geminiAiEnabled: geminiAiEnabled,
       geminiModel: geminiModel,
+      aiProviderMode: aiProviderMode,
+      onDeviceModel: onDeviceModel,
       themeVariant: themeVariant,
       showBgBlobs: showBgBlobs,
       bgTexture: bgTexture,
@@ -250,6 +256,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> setGeminiModel(String model) async {
     state = state.copyWith(geminiModel: model);
     await _prefs.setString(_keyGeminiModel, model);
+  }
+
+  Future<void> setAiProviderMode(String mode) async {
+    state = state.copyWith(aiProviderMode: mode);
+    await _prefs.setString(_keyAiProviderMode, mode);
+  }
+
+  Future<void> setOnDeviceModel(String model) async {
+    state = state.copyWith(onDeviceModel: model);
+    await _prefs.setString(_keyOnDeviceModel, model);
   }
 
   Future<void> setThemeVariant(String variant) async {
@@ -523,6 +539,8 @@ class SettingsNotifier extends Notifier<SettingsState> {
     await _prefs.remove(_keyGeminiApiKey);
     await _prefs.remove(_keyGeminiAiEnabled);
     await _prefs.remove(_keyGeminiModel);
+    await _prefs.remove(_keyAiProviderMode);
+    await _prefs.remove(_keyOnDeviceModel);
     await _prefs.remove(_keyThemeVariant);
     await _prefs.remove(_keyShowBgBlobs);
     await _prefs.remove(_keyBgTexture);

@@ -45,6 +45,8 @@ dependencies:
   shared_preferences: ^2.5.6
   uuid: ^4.6.0
   http: ^1.6.0
+  flutter_edge_ai: ^2.6.0
+  flutter_edge_ai_litertlm: ^1.20.1
   just_audio: ^0.9.36
   speech_to_text: ^7.0.0
   record: ^5.2.0
@@ -53,7 +55,7 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.2
   file_picker: 13.1.0
-
+  flutter_markdown_plus: ^1.0.12
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -109,14 +111,8 @@ flutter:
     - family: SF Pro
       fonts:
         - asset: San-Francisco-Pro-Fonts-master/SF-Pro-Text-Regular.otf
-        - asset: San-Francisco-Pro-Fonts-master/SF-Pro-Text-Medium.otf
-          weight: 500
-        - asset: San-Francisco-Pro-Fonts-master/SF-Pro-Text-Semibold.otf
-          weight: 600
         - asset: San-Francisco-Pro-Fonts-master/SF-Pro-Text-Bold.otf
           weight: 700
-        - asset: San-Francisco-Pro-Fonts-master/SF-Pro-Text-RegularItalic.otf
-          style: italic
 
     - family: SF Pro Display
       fonts:

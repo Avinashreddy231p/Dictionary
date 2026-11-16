@@ -9,6 +9,7 @@ import 'providers/settings_provider.dart';
 export 'providers/settings_provider.dart';
 export 'providers/word_of_the_day_provider.dart';
 export '../data/services/gemini_service.dart';
+export '../data/services/ai_service.dart';
 
 class IndexingProgressState {
   final bool isIndexing;

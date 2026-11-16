@@ -1417,6 +1417,17 @@ class $SavedWordsTable extends SavedWords
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _embeddingMeta = const VerificationMeta(
+    'embedding',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> embedding = GeneratedColumn<Uint8List>(
+    'embedding',
+    aliasedName,
+    true,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1433,6 +1444,7 @@ class $SavedWordsTable extends SavedWords
     reviewState,
     isFavorite,
     source,
+    embedding,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1543,6 +1555,12 @@ class $SavedWordsTable extends SavedWords
         source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
       );
     }
+    if (data.containsKey('embedding')) {
+      context.handle(
+        _embeddingMeta,
+        embedding.isAcceptableOrUnknown(data['embedding']!, _embeddingMeta),
+      );
+    }
     return context;
   }
 
@@ -1608,6 +1626,10 @@ class $SavedWordsTable extends SavedWords
         DriftSqlType.string,
         data['${effectivePrefix}source'],
       ),
+      embedding: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}embedding'],
+      ),
     );
   }
 
@@ -1632,6 +1654,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
   final int reviewState;
   final bool isFavorite;
   final String? source;
+  final Uint8List? embedding;
   const SavedWord({
     required this.id,
     required this.word,
@@ -1647,6 +1670,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
     required this.reviewState,
     required this.isFavorite,
     this.source,
+    this.embedding,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1683,6 +1707,9 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
     if (!nullToAbsent || source != null) {
       map['source'] = Variable<String>(source);
     }
+    if (!nullToAbsent || embedding != null) {
+      map['embedding'] = Variable<Uint8List>(embedding);
+    }
     return map;
   }
 
@@ -1718,6 +1745,9 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
       source: source == null && nullToAbsent
           ? const Value.absent()
           : Value(source),
+      embedding: embedding == null && nullToAbsent
+          ? const Value.absent()
+          : Value(embedding),
     );
   }
 
@@ -1741,6 +1771,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
       reviewState: serializer.fromJson<int>(json['reviewState']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       source: serializer.fromJson<String?>(json['source']),
+      embedding: serializer.fromJson<Uint8List?>(json['embedding']),
     );
   }
   @override
@@ -1761,6 +1792,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
       'reviewState': serializer.toJson<int>(reviewState),
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'source': serializer.toJson<String?>(source),
+      'embedding': serializer.toJson<Uint8List?>(embedding),
     };
   }
 
@@ -1779,6 +1811,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
     int? reviewState,
     bool? isFavorite,
     Value<String?> source = const Value.absent(),
+    Value<Uint8List?> embedding = const Value.absent(),
   }) => SavedWord(
     id: id ?? this.id,
     word: word ?? this.word,
@@ -1796,6 +1829,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
     reviewState: reviewState ?? this.reviewState,
     isFavorite: isFavorite ?? this.isFavorite,
     source: source.present ? source.value : this.source,
+    embedding: embedding.present ? embedding.value : this.embedding,
   );
   SavedWord copyWithCompanion(SavedWordsCompanion data) {
     return SavedWord(
@@ -1823,6 +1857,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
           ? data.isFavorite.value
           : this.isFavorite,
       source: data.source.present ? data.source.value : this.source,
+      embedding: data.embedding.present ? data.embedding.value : this.embedding,
     );
   }
 
@@ -1842,7 +1877,8 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
           ..write('personalNote: $personalNote, ')
           ..write('reviewState: $reviewState, ')
           ..write('isFavorite: $isFavorite, ')
-          ..write('source: $source')
+          ..write('source: $source, ')
+          ..write('embedding: $embedding')
           ..write(')'))
         .toString();
   }
@@ -1863,6 +1899,7 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
     reviewState,
     isFavorite,
     source,
+    $driftBlobEquality.hash(embedding),
   );
   @override
   bool operator ==(Object other) =>
@@ -1881,7 +1918,8 @@ class SavedWord extends DataClass implements Insertable<SavedWord> {
           other.personalNote == this.personalNote &&
           other.reviewState == this.reviewState &&
           other.isFavorite == this.isFavorite &&
-          other.source == this.source);
+          other.source == this.source &&
+          $driftBlobEquality.equals(other.embedding, this.embedding));
 }
 
 class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
@@ -1899,6 +1937,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
   final Value<int> reviewState;
   final Value<bool> isFavorite;
   final Value<String?> source;
+  final Value<Uint8List?> embedding;
   const SavedWordsCompanion({
     this.id = const Value.absent(),
     this.word = const Value.absent(),
@@ -1914,6 +1953,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
     this.reviewState = const Value.absent(),
     this.isFavorite = const Value.absent(),
     this.source = const Value.absent(),
+    this.embedding = const Value.absent(),
   });
   SavedWordsCompanion.insert({
     this.id = const Value.absent(),
@@ -1930,6 +1970,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
     this.reviewState = const Value.absent(),
     this.isFavorite = const Value.absent(),
     this.source = const Value.absent(),
+    this.embedding = const Value.absent(),
   }) : word = Value(word),
        dateAdded = Value(dateAdded);
   static Insertable<SavedWord> custom({
@@ -1947,6 +1988,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
     Expression<int>? reviewState,
     Expression<bool>? isFavorite,
     Expression<String>? source,
+    Expression<Uint8List>? embedding,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1963,6 +2005,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
       if (reviewState != null) 'review_state': reviewState,
       if (isFavorite != null) 'is_favorite': isFavorite,
       if (source != null) 'source': source,
+      if (embedding != null) 'embedding': embedding,
     });
   }
 
@@ -1981,6 +2024,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
     Value<int>? reviewState,
     Value<bool>? isFavorite,
     Value<String?>? source,
+    Value<Uint8List?>? embedding,
   }) {
     return SavedWordsCompanion(
       id: id ?? this.id,
@@ -1997,6 +2041,7 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
       reviewState: reviewState ?? this.reviewState,
       isFavorite: isFavorite ?? this.isFavorite,
       source: source ?? this.source,
+      embedding: embedding ?? this.embedding,
     );
   }
 
@@ -2045,6 +2090,9 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
+    if (embedding.present) {
+      map['embedding'] = Variable<Uint8List>(embedding.value);
+    }
     return map;
   }
 
@@ -2064,7 +2112,8 @@ class SavedWordsCompanion extends UpdateCompanion<SavedWord> {
           ..write('personalNote: $personalNote, ')
           ..write('reviewState: $reviewState, ')
           ..write('isFavorite: $isFavorite, ')
-          ..write('source: $source')
+          ..write('source: $source, ')
+          ..write('embedding: $embedding')
           ..write(')'))
         .toString();
   }
@@ -4294,6 +4343,7 @@ typedef $$SavedWordsTableCreateCompanionBuilder = SavedWordsCompanion Function({
   Value<int> reviewState,
   Value<bool> isFavorite,
   Value<String?> source,
+  Value<Uint8List?> embedding,
 });
 typedef $$SavedWordsTableUpdateCompanionBuilder = SavedWordsCompanion Function({
   Value<int> id,
@@ -4310,6 +4360,7 @@ typedef $$SavedWordsTableUpdateCompanionBuilder = SavedWordsCompanion Function({
   Value<int> reviewState,
   Value<bool> isFavorite,
   Value<String?> source,
+  Value<Uint8List?> embedding,
 });
 
 final class $$SavedWordsTableReferences
@@ -4413,6 +4464,11 @@ class $$SavedWordsTableFilterComposer
 
   ColumnFilters<String> get source => $composableBuilder(
     column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get embedding => $composableBuilder(
+    column: $table.embedding,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4520,6 +4576,11 @@ class $$SavedWordsTableOrderingComposer
     column: $table.source,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<Uint8List> get embedding => $composableBuilder(
+    column: $table.embedding,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedWordsTableAnnotationComposer
@@ -4582,6 +4643,9 @@ class $$SavedWordsTableAnnotationComposer
 
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get embedding =>
+      $composableBuilder(column: $table.embedding, builder: (column) => column);
 
   Expression<T> collectionWordsRefs<T extends Object>(
     Expression<T> Function($$CollectionWordsTableAnnotationComposer a) f,
@@ -4651,6 +4715,7 @@ class $$SavedWordsTableTableManager
                 Value<int> reviewState = const Value.absent(),
                 Value<bool> isFavorite = const Value.absent(),
                 Value<String?> source = const Value.absent(),
+                Value<Uint8List?> embedding = const Value.absent(),
               }) => SavedWordsCompanion(
                 id: id,
                 word: word,
@@ -4666,6 +4731,7 @@ class $$SavedWordsTableTableManager
                 reviewState: reviewState,
                 isFavorite: isFavorite,
                 source: source,
+                embedding: embedding,
               ),
           createCompanionCallback:
               ({
@@ -4683,6 +4749,7 @@ class $$SavedWordsTableTableManager
                 Value<int> reviewState = const Value.absent(),
                 Value<bool> isFavorite = const Value.absent(),
                 Value<String?> source = const Value.absent(),
+                Value<Uint8List?> embedding = const Value.absent(),
               }) => SavedWordsCompanion.insert(
                 id: id,
                 word: word,
@@ -4698,6 +4765,7 @@ class $$SavedWordsTableTableManager
                 reviewState: reviewState,
                 isFavorite: isFavorite,
                 source: source,
+                embedding: embedding,
               ),
           withReferenceMapper: (p0) => p0
               .map(

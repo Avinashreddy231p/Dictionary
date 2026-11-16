@@ -91,9 +91,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
 
-    // Save to recent searches DB table
-    ref.read(databaseProvider).addRecentSearch(cleanQuery);
-
     setState(() {
       _isLoading = true;
       _lastQuery = cleanQuery;
@@ -101,6 +98,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     final repository = ref.read(dictionaryRepositoryProvider);
     final searchResult = await repository.searchWord(cleanQuery);
+
+    // Save to recent searches DB table & saved words (visited/searched) with full definition/phonetic data
+    final db = ref.read(databaseProvider);
+    db.addRecentSearch(cleanQuery);
+
+    if (searchResult.entries.isNotEmpty) {
+      final entry = searchResult.entries.first;
+      db.saveWord(
+        word: cleanQuery,
+        phonetic: entry.core.phonetic,
+        partOfSpeech: entry.core.partOfSpeech,
+        meaning: entry.dictionaryLayer.simpleMeaning,
+        example: entry.dictionaryLayer.contextualMeaning,
+        syllables: entry.core.syllables.join('*'),
+      );
+    } else {
+      db.saveWord(word: cleanQuery);
+    }
 
     setState(() {
       _results = searchResult.entries;

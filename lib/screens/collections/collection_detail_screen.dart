@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,8 @@ import '../../core/providers.dart';
 import '../../theme/app_colors.dart';
 import '../../data/models/lexical_entry.dart';
 import '../../data/services/export_service.dart';
+import '../../data/services/ai_service.dart';
+import '../../data/services/on_device_ai_service.dart';
 
 class CollectionDetailScreen extends ConsumerStatefulWidget {
   final int? collectionId;
@@ -34,11 +37,65 @@ class CollectionDetailScreen extends ConsumerStatefulWidget {
 class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  
+  bool _isSemanticSearch = false;
+  bool _isSemanticSearching = false;
+  List<SavedWord>? _semanticResults;
+
+  void _disposeSearch() {
+    _searchController.dispose();
+  }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _disposeSearch();
     super.dispose();
+  }
+
+  Future<void> _performSemanticSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _semanticResults = null;
+        _isSemanticSearching = false;
+      });
+      return;
+    }
+
+    setState(() => _isSemanticSearching = true);
+
+    try {
+      final onDeviceAi = ref.read(onDeviceAiServiceProvider);
+      final modelId = OnDeviceAiService.availableEmbeddingModels.first.id;
+      final db = ref.read(databaseProvider);
+
+      // Automatically backfill missing embeddings for pre-existing saved words
+      final allSaved = await db.select(db.savedWords).get();
+      for (final word in allSaved) {
+        if (word.embedding == null) {
+          final embedText = '${word.word}: ${word.meaning ?? ''}';
+          final vector = await onDeviceAi.generateEmbedding(embedText, modelId);
+          if (vector != null) {
+            final bytes = Uint8List.view(vector.buffer);
+            await db.updateSavedWordEmbedding(word.id, bytes);
+          }
+        }
+      }
+
+      final vector = await onDeviceAi.generateEmbedding(query, modelId);
+      if (vector != null) {
+        final results = await db.searchSavedWordsByEmbedding(vector, limit: 20);
+        if (mounted) {
+          setState(() {
+            _semanticResults = results;
+            _isSemanticSearching = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isSemanticSearching = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isSemanticSearching = false);
+    }
   }
 
   void _showAddWordBottomSheet(BuildContext context, int collectionId) {
@@ -311,6 +368,110 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
         ),
       ),
     );
+  }
+
+  void _showAiStoryDialog(BuildContext context, List<SavedWord> words) {
+    if (words.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add words to your collection first to generate an AI story!')),
+      );
+      return;
+    }
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = theme.primaryColor;
+    String selectedGenre = 'Sci-Fi';
+    final genres = ['Sci-Fi', 'Mystery', 'Business', 'Romance', 'Fantasy'];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardTheme.color ?? (isDark ? const Color(0xFF1E1E2C) : Colors.white),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(CupertinoIcons.sparkles, color: primaryColor, size: 22),
+                      const SizedBox(width: 10),
+                      const Text('AI Custom Story Generator', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Create an engaging short story incorporating all ${words.length} words in this collection.',
+                    style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Select Genre:', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: genres.map((genre) {
+                      final isSelected = selectedGenre == genre;
+                      return ChoiceChip(
+                        label: Text(genre),
+                        selected: isSelected,
+                        selectedColor: primaryColor,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : (isDark ? Colors.white : AppColors.textPrimary),
+                          fontWeight: FontWeight.w800,
+                        ),
+                        onSelected: (val) {
+                          if (val) setDialogState(() => selectedGenre = genre);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _navigateToStoryScreen(context, words.map((w) => w.word).toList(), selectedGenre);
+                        },
+                        child: const Text('Generate Story', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToStoryScreen(BuildContext context, List<String> words, String genre) {
+    context.push('/collection-story', extra: {
+      'words': words,
+      'genre': genre,
+    });
   }
 
   void _showExportCollectionBottomSheet(BuildContext context, List<SavedWord> words) {
@@ -924,6 +1085,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
         title: Text(widget.title),
         actions: [
           IconButton(
+            icon: const Icon(CupertinoIcons.book_fill),
+            tooltip: 'Generate AI Story',
+            onPressed: () => _showAiStoryDialog(context, wordsAsync.value ?? []),
+          ),
+          IconButton(
             icon: const Icon(CupertinoIcons.share),
             tooltip: 'Export Collection',
             onPressed: () => _showExportCollectionBottomSheet(context, wordsAsync.value ?? []),
@@ -1078,8 +1244,41 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Filter words in this collection...',
+                      hintText: _isSemanticSearch ? 'Search by meaning/concept (AI)...' : 'Filter words in this collection...',
                       prefixIcon: Icon(CupertinoIcons.search, color: isDark ? Colors.white60 : AppColors.textSecondary),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          CupertinoIcons.sparkles,
+                          color: _isSemanticSearch ? theme.primaryColor : (isDark ? Colors.white54 : AppColors.textSecondary),
+                        ),
+                        tooltip: 'Toggle Offline Semantic Concept Search',
+                        onPressed: () async {
+                          final onDeviceAi = ref.read(onDeviceAiServiceProvider);
+                          final modelId = OnDeviceAiService.availableEmbeddingModels.first.id;
+                          final isReady = await onDeviceAi.isEmbeddingModelReady(modelId);
+                          
+                          if (!isReady && !_isSemanticSearch) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please download the Semantic Search Engine in AI Settings first!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          setState(() {
+                            _isSemanticSearch = !_isSemanticSearch;
+                            if (!_isSemanticSearch) {
+                              _semanticResults = null;
+                            } else if (_searchQuery.isNotEmpty) {
+                              _performSemanticSearch(_searchQuery);
+                            }
+                          });
+                        },
+                      ),
                       filled: true,
                       fillColor: theme.cardTheme.color,
                       border: OutlineInputBorder(
@@ -1096,6 +1295,11 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                     ),
+                    onSubmitted: (val) {
+                      if (_isSemanticSearch) {
+                        _performSemanticSearch(val);
+                      }
+                    },
                   ),
                 ),
               ),
@@ -1104,9 +1308,29 @@ class _CollectionDetailScreenState extends ConsumerState<CollectionDetailScreen>
             // 3. Word List Slivers
             wordsAsync.when(
               data: (words) {
-                final filtered = _searchQuery.isEmpty
-                    ? words
-                    : words.where((w) => w.word.toLowerCase().contains(_searchQuery)).toList();
+                final List<SavedWord> filtered;
+                if (_isSemanticSearch) {
+                  if (_isSemanticSearching) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(color: theme.primaryColor),
+                            const SizedBox(height: 16),
+                            const Text('Searching by concept locally...'),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  filtered = _semanticResults ?? words;
+                } else {
+                  filtered = _searchQuery.isEmpty
+                      ? words
+                      : words.where((w) => w.word.toLowerCase().contains(_searchQuery)).toList();
+                }
 
                 if (filtered.isEmpty) {
                   return SliverFillRemaining(

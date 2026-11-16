@@ -183,8 +183,8 @@ class _PronunciationPracticeWidgetState
             });
           }
         },
-        listenFor: const Duration(seconds: 8),
-        pauseFor: const Duration(seconds: 3),
+        listenFor: const Duration(seconds: 12),
+        pauseFor: const Duration(seconds: 4),
         partialResults: true,
         cancelOnError: false,
         listenMode: stt.ListenMode.confirmation,
@@ -585,7 +585,7 @@ class _PronunciationPracticeWidgetState
               children: [
                 // Glowing Pulse Mic Button
                 GestureDetector(
-                  onTap: _isListening ? null : _startSpeechVerification,
+                  onTap: _isListening ? _evaluateAndFinishSpeech : _startSpeechVerification,
                   child: AnimatedBuilder(
                     animation: _pulseController,
                     builder: (context, child) {

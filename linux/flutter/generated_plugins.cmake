@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  flutter_edge_ai
   printing
   record_linux
   url_launcher_linux

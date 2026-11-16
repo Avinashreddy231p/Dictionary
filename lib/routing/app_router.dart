@@ -14,6 +14,8 @@ import '../screens/settings/sub_screens/about_settings_screen.dart';
 import '../screens/stats/stats_screen.dart';
 import '../screens/flashcards/flashcard_screen.dart';
 import '../screens/quiz/quiz_screen.dart';
+import '../screens/word_detail/etymology_explorer_screen.dart';
+import '../screens/collections/ai_story_screen.dart';
 import '../features/reading/reading_screen.dart';
 import '../screens/main_scaffold.dart';
 import '../data/models/lexical_entry.dart';
@@ -50,6 +52,24 @@ final goRouter = GoRouter(
       path: '/reading',
       parentNavigatorKey: _rootNavigatorKey,
       builder: (context, state) => const ReadingScreen(),
+    ),
+    GoRoute(
+      path: '/etymology/:word',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final wordParam = state.pathParameters['word'] ?? '';
+        return EtymologyExplorerScreen(word: wordParam);
+      },
+    ),
+    GoRoute(
+      path: '/collection-story',
+      parentNavigatorKey: _rootNavigatorKey,
+      builder: (context, state) {
+        final data = state.extra as Map<String, dynamic>?;
+        final words = (data?['words'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+        final genre = data?['genre'] as String? ?? 'Sci-Fi';
+        return AiStoryScreen(words: words, genre: genre);
+      },
     ),
     GoRoute(
       path: '/settings/appearance',

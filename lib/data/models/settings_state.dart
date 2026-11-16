@@ -19,6 +19,8 @@ class SettingsState {
   final String geminiApiKey;
   final bool geminiAiEnabled;
   final String geminiModel; // "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"
+  final String aiProviderMode; // 'hybrid_auto', 'on_device', 'cloud_gemini'
+  final String onDeviceModel; // 'gemma3_270m', 'gemma4_e2b', 'qwen3_06b'
   final String themeVariant; // 'standard', 'sepia', 'oled'
   final bool showBgBlobs;
   final String bgTexture; // 'none', 'dots', 'grid', 'crosshatch'
@@ -52,6 +54,8 @@ class SettingsState {
     this.geminiApiKey = '',
     this.geminiAiEnabled = true,
     this.geminiModel = 'gemini-2.0-flash',
+    this.aiProviderMode = 'hybrid_auto',
+    this.onDeviceModel = 'gemma3_270m',
     this.themeVariant = 'standard',
     this.showBgBlobs = true,
     this.bgTexture = 'dots',
@@ -86,6 +90,8 @@ class SettingsState {
     String? geminiApiKey,
     bool? geminiAiEnabled,
     String? geminiModel,
+    String? aiProviderMode,
+    String? onDeviceModel,
     String? themeVariant,
     bool? showBgBlobs,
     String? bgTexture,
@@ -122,6 +128,8 @@ class SettingsState {
       geminiApiKey: geminiApiKey ?? this.geminiApiKey,
       geminiAiEnabled: geminiAiEnabled ?? this.geminiAiEnabled,
       geminiModel: geminiModel ?? this.geminiModel,
+      aiProviderMode: aiProviderMode ?? this.aiProviderMode,
+      onDeviceModel: onDeviceModel ?? this.onDeviceModel,
       themeVariant: themeVariant ?? this.themeVariant,
       showBgBlobs: showBgBlobs ?? this.showBgBlobs,
       bgTexture: bgTexture ?? this.bgTexture,
